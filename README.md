@@ -1,14 +1,14 @@
 # Crachá | US Vale Verde
 
-Aplicação estática para localizar um colaborador pelo registro e gerar a frente e o verso do crachá em PDF ou PNG de alta resolução.
+Aplicação estática para localizar um colaborador pelo nome ou registro e gerar a frente e o verso do crachá em PDF ou PNG de alta resolução.
 
 ## Dados
 
 - Planilha Google: `1R4h8YtBFPDzD70DlNZQ88C7nJ9Gd9Yfd`
 - Fotos dos colaboradores: [pasta no Google Drive](https://drive.google.com/drive/folders/1a1jEChDi6Vg1K6PEHqm6UqeDTEDCz4WB)
-- Abas consultadas: `Matriz` (colaboradores e permissões) e `Treinamentos` (cadastro de treinamentos)
+- Abas consultadas: `Matriz` (colaboradores, documentos e permissões) e `Treinamentos` (cadastro de treinamentos)
 - A planilha precisa permitir leitura para qualquer pessoa com o link. A página lê as abas pelo endpoint de visualização do Google ao abrir e no botão de atualizar.
-- As fotos são correspondidas pelo número de registro com os arquivos da pasta `Fotos dos Funcionários` no Drive.
+- As fotos são vinculadas ao número de registro; os registros 6257 e 8260 usam as imagens da referência visual e os demais usam a pasta de fotos no Drive.
 - O app não grava dados na planilha. Fotos adicionadas pelo operador ficam no armazenamento local do navegador neste computador.
 
 ## Publicação
@@ -17,6 +17,7 @@ O workflow `.github/workflows/pages.yml` publica a raiz do repositório no GitHu
 
 ## Operação
 
-1. Informe o número de registro e selecione **Buscar**.
-2. Se necessário, associe a foto do colaborador pelo botão **Foto**.
-3. Baixe o PDF (frente e verso) ou os dois PNGs em alta resolução.
+1. Digite o nome ou o número de registro e escolha uma sugestão ou **Buscar**.
+2. Use **Ver planilha** para consultar as abas `Matriz` e `Treinamentos` dentro do site.
+3. Se necessário, associe uma foto pelo botão **Foto**.
+4. Baixe o PDF (frente e verso) ou os dois PNGs em alta resolução.

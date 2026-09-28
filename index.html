@@ -13,8 +13,8 @@
   <header class="topbar"><div class="brand"><img src="assets/openblast-mark.png" alt=""><b>Open<span>Blast</span></b></div><strong>Ferramentas : US Vale Verde</strong><span></span></header>
   <main>
     <section class="toolbar" aria-label="Localizar colaborador">
-      <label for="registro">NÚMERO DE REGISTRO</label>
-      <div class="searchline"><input id="registro" inputmode="numeric" autocomplete="off" placeholder="Digite o número de registro"><button id="search" class="primary">Buscar</button><button id="refresh" class="sync" title="Atualizar dados da planilha" aria-label="Atualizar dados">↻</button></div>
+      <label for="registro">NOME OU REGISTRO</label>
+      <div class="searchline"><input id="registro" type="search" list="staff-suggestions" autocomplete="off" placeholder="Digite o nome ou o registro"><datalist id="staff-suggestions"></datalist><button id="search" class="primary">Buscar</button><button id="sheet-open" class="outline" type="button" disabled>Ver planilha</button><button id="refresh" class="sync" title="Atualizar dados da planilha" aria-label="Atualizar dados">↻</button></div>
       <small id="source-status" role="status">Conectando à planilha…</small>
     </section>
 
@@ -23,9 +23,24 @@
       <div class="cards"><article class="badge" id="front-card" aria-label="Frente do crachá"></article><article class="badge" id="back-card" aria-label="Verso do crachá"></article></div>
       <div class="sides"><span>Frente</span><span>Verso</span></div>
     </section>
-    <div id="empty" class="empty">Digite o registro do colaborador.</div>
+    <div id="empty" class="empty">Digite o nome ou o registro do colaborador.</div>
     <div id="error" class="error" role="alert" hidden></div>
   </main>
+  <dialog id="sheet-dialog" class="sheet-dialog" aria-labelledby="sheet-title">
+    <div class="sheet-head">
+      <h2 id="sheet-title">Planilha</h2>
+      <button id="sheet-close" class="close-sheet" type="button" aria-label="Fechar">×</button>
+    </div>
+    <div class="sheet-controls">
+      <div class="sheet-tabs" role="tablist" aria-label="Abas da planilha">
+        <button id="sheet-tab-matrix" class="sheet-tab" type="button" role="tab" aria-selected="true">Matriz</button>
+        <button id="sheet-tab-training" class="sheet-tab" type="button" role="tab" aria-selected="false">Treinamentos</button>
+      </div>
+      <input id="sheet-filter" type="search" placeholder="Filtrar linhas" aria-label="Filtrar linhas">
+      <span id="sheet-count" role="status"></span>
+    </div>
+    <div id="sheet-content" class="sheet-content" role="tabpanel" tabindex="0"></div>
+  </dialog>
   <footer><i></i> HUB OPERACIONAL OPENBLAST</footer>
 </body>
 </html>

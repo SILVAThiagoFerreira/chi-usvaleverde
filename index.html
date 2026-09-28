@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#3b444d">
+  <title>Crachá | US Vale Verde</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="topbar"><div class="brand"><img src="assets/openblast-mark.png" alt=""><b>Open<span>Blast</span></b></div><strong>Ferramentas : US Vale Verde</strong><span></span></header>
+  <main>
+    <section class="toolbar" aria-label="Localizar colaborador">
+      <label for="registro">NÚMERO DE REGISTRO</label>
+      <div class="searchline"><input id="registro" inputmode="numeric" autocomplete="off" placeholder="Digite o número de registro"><button id="search" class="primary">Buscar</button><button id="refresh" class="sync" title="Atualizar dados da planilha" aria-label="Atualizar dados">↻</button></div>
+      <small id="source-status" role="status">Conectando à planilha…</small>
+    </section>
+
+    <section id="result" class="result" hidden>
+      <div class="personline"><div><span id="employee-id" class="eyebrow"></span><h1 id="employee-name"></h1><p id="employee-role"></p></div><div class="actions"><label class="upload">Foto <input id="photo" type="file" accept="image/*" hidden></label><button id="pdf" class="primary" disabled>Baixar PDF</button><button id="png" class="outline" disabled>Baixar PNG</button></div></div>
+      <div class="cards"><article class="badge" id="front-card" aria-label="Frente do crachá"></article><article class="badge" id="back-card" aria-label="Verso do crachá"></article></div>
+      <div class="sides"><span>Frente</span><span>Verso</span></div>
+    </section>
+    <div id="empty" class="empty">Digite o registro do colaborador.</div>
+    <div id="error" class="error" role="alert" hidden></div>
+  </main>
+  <footer><i></i> HUB OPERACIONAL OPENBLAST</footer>
+</body>
+</html>

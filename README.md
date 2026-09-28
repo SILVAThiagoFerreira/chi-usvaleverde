@@ -5,6 +5,7 @@ Aplicação estática para localizar um colaborador pelo registro e gerar a fren
 ## Dados
 
 - Planilha Google: `1R4h8YtBFPDzD70DlNZQ88C7nJ9Gd9Yfd`
+- Fotos dos colaboradores: [pasta no Google Drive](https://drive.google.com/drive/folders/1a1jEChDi6Vg1K6PEHqm6UqeDTEDCz4WB)
 - Abas consultadas: `Matriz` (colaboradores e permissões) e `Treinamentos` (cadastro de treinamentos)
 - A planilha precisa permitir leitura para qualquer pessoa com o link. A página lê as abas pelo endpoint de visualização do Google ao abrir e no botão de atualizar.
 - As fotos são correspondidas pelo número de registro com os arquivos da pasta `Fotos dos Funcionários` no Drive.

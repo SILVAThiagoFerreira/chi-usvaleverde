@@ -6,6 +6,8 @@ let staff = [];
 let photoMap = {};
 let matrixTable = null;
 let trainingTable = null;
+let trainingLoading = false;
+let trainingLoadError = '';
 let activeSheet = 'Matriz';
 let selected = null;
 let requestNo = 0;
@@ -67,6 +69,14 @@ function photoSource(id, stored = '') {
     : 'https://lh3.googleusercontent.com/d/' + encodeURIComponent(source) + '=w1000';
 }
 
+function readStoredPhoto(id) {
+  try {
+    return localStorage.getItem('badge-photo-' + id) || '';
+  } catch (_) {
+    return '';
+  }
+}
+
 function formatMonthYear(value) {
   const text = formatDate(value);
   const match = text.match(/^\d{2}\/(\d{2})\/(\d{4})$/);
@@ -114,6 +124,11 @@ function updateSuggestions() {
     return '<option value="' + esc(isNumber ? person.id : txt(person.cells, 1))
       + '" label="' + esc(isNumber ? name : 'Registro ' + person.id) + '"></option>';
   }).join('');
+  const matchesSelected = selected && (term === normalize(selected.id)
+    || term === normalize(txt(selected.cells, 1)));
+  $('#pdf').disabled = !matchesSelected;
+  $('#png').disabled = !matchesSelected;
+  $('#photo').disabled = !matchesSelected;
 }
 
 function sheetData(table) {
@@ -139,15 +154,25 @@ function sheetRows(table) {
 }
 
 function updateSheetLabels() {
-  const matrixCount = sheetRows(matrixTable).length;
-  const trainingCount = sheetRows(trainingTable).length;
-  $('#sheet-tab-matrix').textContent = 'Matriz · ' + matrixCount;
-  $('#sheet-tab-training').textContent = 'Treinamentos · ' + trainingCount;
+  $('#sheet-tab-matrix').textContent = matrixTable
+    ? 'Matriz · ' + sheetRows(matrixTable).length : 'Matriz';
+  $('#sheet-tab-training').textContent = trainingLoading
+    ? 'Treinamentos · atualizando…'
+    : trainingTable ? 'Treinamentos · ' + sheetRows(trainingTable).length
+      : trainingLoadError ? 'Treinamentos · indisponível' : 'Treinamentos';
 }
 
 function renderSheet() {
   const table = activeSheet === 'Matriz' ? matrixTable : trainingTable;
-  if (!table) return;
+  if (!table) {
+    const message = activeSheet === 'Treinamentos'
+      ? trainingLoading ? 'Carregando a aba Treinamentos…'
+        : trainingLoadError || 'Aba Treinamentos indisponível.'
+      : 'Aba Matriz indisponível.';
+    $('#sheet-count').textContent = '—';
+    $('#sheet-content').innerHTML = '<div class="sheet-empty">' + esc(message) + '</div>';
+    return;
+  }
   const data = sheetData(table);
   const allRows = data.rows;
   const term = normalize($('#sheet-filter').value);
@@ -175,16 +200,22 @@ async function loadData() {
   const thisRequest = ++requestNo;
   setStatus('Conectando à planilha…');
   $('#error').hidden = true;
+  trainingLoading = true;
+  trainingLoadError = '';
+  updateSheetLabels();
+  if ($('#sheet-dialog').open) renderSheet();
+  const trainingRequest = query('Treinamentos', 1).then(
+    table => ({ table, error: '' }),
+    error => ({ table: null, error: error.message || 'Não foi possível ler a aba Treinamentos.' })
+  );
   try {
-    const [matrix, trainings, photos] = await Promise.all([
+    const [matrix, photos] = await Promise.all([
       query('Matriz', 3),
-      query('Treinamentos', 1),
-      fetch('assets/photos.json', { cache: 'no-store' }).then(response => response.ok ? response.json() : {}).catch(() => ({}))
+      fetch('assets/photos.json', { cache: 'no-store' }).then(response => response.ok ? response.json() : null).catch(() => null)
     ]);
     if (thisRequest !== requestNo) return;
-    photoMap = photos;
+    if (photos && typeof photos === 'object' && !Array.isArray(photos)) photoMap = photos;
     matrixTable = matrix;
-    trainingTable = trainings;
     window.__headers = matrix.cols.map(column => column.label || '');
     staff = matrix.rows.map(row => ({ cells: row, id: txt(row, 0) })).filter(person => person.id);
     setStatus('Planilha atualizada · ' + staff.length + ' colaboradores');
@@ -199,8 +230,21 @@ async function loadData() {
         render(selected);
       } else clearResult();
     }
+    updateSuggestions();
+
+    const trainingResult = await trainingRequest;
+    if (thisRequest !== requestNo) return;
+    trainingTable = trainingResult.table;
+    trainingLoadError = trainingResult.error;
+    trainingLoading = false;
+    updateSheetLabels();
+    if ($('#sheet-dialog').open) renderSheet();
   } catch (error) {
     if (thisRequest !== requestNo) return;
+    trainingLoading = false;
+    trainingLoadError = 'Não foi possível atualizar a aba Treinamentos.';
+    updateSheetLabels();
+    if ($('#sheet-dialog').open) renderSheet();
     setStatus('Falha de conexão', true);
     $('#error').textContent = error.message;
     $('#error').hidden = false;
@@ -222,7 +266,7 @@ function render(item) {
   $('#error').hidden = true;
   $('#result').hidden = false;
 
-  const stored = localStorage.getItem('badge-photo-' + id);
+  const stored = readStoredPhoto(id);
   const photoSrc = photoSource(id, stored);
   const photo = photoSrc
     ? '<img class="portrait" crossorigin="anonymous" alt="Foto de ' + esc(name) + '" src="' + esc(photoSrc) + '" onerror="this.classList.add(\'photo-failed\')">'
@@ -287,6 +331,7 @@ function render(item) {
   $('#photo').value = '';
   $('#pdf').disabled = false;
   $('#png').disabled = false;
+  $('#photo').disabled = false;
 }
 
 function clearResult() {
@@ -296,26 +341,30 @@ function clearResult() {
   $('#empty').textContent = 'Digite o nome ou o registro do colaborador.';
   $('#pdf').disabled = true;
   $('#png').disabled = true;
+  $('#photo').disabled = true;
 }
 
 function search() {
   const value = $('#registro').value.trim();
   const key = normalize(value);
-  if (!value) return;
   $('#error').hidden = true;
-  let person = staff.find(candidate => candidate.id === value || normalize(txt(candidate.cells, 1)) === key);
+  if (!value) {
+    $('#error').textContent = 'Digite o nome ou o registro do colaborador.';
+    $('#error').hidden = false;
+    return;
+  }
+  const exactId = staff.find(candidate => candidate.id === value);
+  const exactNames = staff.filter(candidate => normalize(txt(candidate.cells, 1)) === key);
+  let person = exactId || (exactNames.length === 1 ? exactNames[0] : null);
   if (!person) {
     const matches = staff.filter(candidate =>
       normalize(candidate.id).includes(key) || normalize(txt(candidate.cells, 1)).includes(key)
     );
-    if (matches.length === 1) person = matches[0];
-    else {
-      $('#error').textContent = matches.length > 1
-        ? 'Selecione o colaborador nas sugestões.'
-        : 'Colaborador não encontrado.';
-      $('#error').hidden = false;
-      return;
-    }
+    $('#error').textContent = exactNames.length > 1 || matches.length > 1
+      ? 'Mais de um colaborador corresponde. Refine o nome ou informe o registro.'
+      : 'Colaborador não encontrado.';
+    $('#error').hidden = false;
+    return;
   }
   $('#registro').value = person.id;
   selected = person;
@@ -332,14 +381,29 @@ const svgField = (x, y, width, height, label, value, size = 18) =>
   + svgText(x + 9, y + 22, label, 14, 700)
   + svgText(x + 9, y + 50, truncate(value, 33), size, 400);
 
-async function badgeSvg(panel) {
-  const row = selected.cells;
-  const id = selected.id;
-  const stored = localStorage.getItem('badge-photo-' + id);
-  const photoSrc = photoSource(id, stored);
+function exportSnapshot(person = selected) {
+  if (!person) return null;
+  return {
+    id: person.id,
+    cells: person.cells,
+    photoSrc: photoSource(person.id, readStoredPhoto(person.id))
+  };
+}
+
+async function badgeSvg(panel, person = selected) {
+  if (!person) throw new Error('Selecione um colaborador antes de exportar.');
+  const row = person.cells;
+  const id = person.id;
+  const photoSrc = person.photoSrc ?? photoSource(id, readStoredPhoto(id));
   const [logoBlob, sealBlob] = await Promise.all([
-    fetch('assets/enaex.png').then(response => response.blob()),
-    fetch('assets/chi.png').then(response => response.blob())
+    fetch('assets/enaex.png').then(response => {
+      if (!response.ok) throw new Error('Não foi possível carregar a marca Enaex.');
+      return response.blob();
+    }),
+    fetch('assets/chi.png').then(response => {
+      if (!response.ok) throw new Error('Não foi possível carregar o selo CHI.');
+      return response.blob();
+    })
   ]);
   const asDataUrl = blob => new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -433,8 +497,8 @@ async function badgeSvg(panel) {
   return svg + '</svg>';
 }
 
-async function cardCanvas(panel) {
-  const svg = await badgeSvg(panel);
+async function cardCanvas(panel, person = selected) {
+  const svg = await badgeSvg(panel, person);
   const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
   try {
     const image = new Image();
@@ -462,14 +526,16 @@ function download(url, name) {
 }
 
 async function exportPng() {
-  if (!selected) return;
+  const person = exportSnapshot();
+  if (!person) return;
+  const filenameId = String(person.id).replace(/[\\/:*?"<>|]/g, '_');
   try {
     for (const [panel, side] of [[$('#front-card'), 'frente'], [$('#back-card'), 'verso']]) {
-      const canvas = await cardCanvas(panel);
+      const canvas = await cardCanvas(panel, person);
       const blob = await new Promise((resolve, reject) =>
         canvas.toBlob(file => file ? resolve(file) : reject(new Error('Falha ao gerar imagem.')), 'image/png')
       );
-      download(URL.createObjectURL(blob), 'cracha-' + selected.id + '-' + side + '.png');
+      download(URL.createObjectURL(blob), 'cracha-' + filenameId + '-' + side + '.png');
     }
   } catch (error) {
     $('#error').textContent = error.message;
@@ -488,8 +554,8 @@ function concatenate(parts) {
   return output;
 }
 
-async function jpegBytes(panel) {
-  const canvas = await cardCanvas(panel);
+async function jpegBytes(panel, person) {
+  const canvas = await cardCanvas(panel, person);
   const blob = await new Promise((resolve, reject) =>
     canvas.toBlob(file => file ? resolve(file) : reject(new Error('Falha ao preparar o PDF.')), 'image/jpeg', .96)
   );
@@ -541,11 +607,13 @@ function createPdf(images) {
 }
 
 async function exportPdf() {
-  if (!selected) return;
+  const person = exportSnapshot();
+  if (!person) return;
+  const filenameId = String(person.id).replace(/[\\/:*?"<>|]/g, '_');
   try {
     const images = [];
-    for (const panel of [$('#front-card'), $('#back-card')]) images.push(await jpegBytes(panel));
-    download(URL.createObjectURL(createPdf(images)), 'cracha-' + selected.id + '.pdf');
+    for (const panel of [$('#front-card'), $('#back-card')]) images.push(await jpegBytes(panel, person));
+    download(URL.createObjectURL(createPdf(images)), 'cracha-' + filenameId + '.pdf');
   } catch (error) {
     $('#error').textContent = error.message;
     $('#error').hidden = false;
@@ -582,21 +650,44 @@ $('#pdf').addEventListener('click', exportPdf);
 $('#png').addEventListener('click', exportPng);
 $('#photo').addEventListener('change', event => {
   const file = event.target.files?.[0];
-  if (!file || !selected) return;
+  const personId = selected?.id;
+  if (!file || !personId) return;
+  if (!file.type.startsWith('image/') || file.type === 'image/svg+xml') {
+    $('#error').textContent = 'Escolha uma imagem raster válida (JPG, PNG ou WebP).';
+    $('#error').hidden = false;
+    event.target.value = '';
+    return;
+  }
   if (file.size > 4 * 1024 * 1024) {
     $('#error').textContent = 'A imagem deve ter no máximo 4 MB.';
     $('#error').hidden = false;
+    event.target.value = '';
     return;
   }
   const reader = new FileReader();
   reader.onload = () => {
-    try {
-      localStorage.setItem('badge-photo-' + selected.id, reader.result);
-      render(selected);
-    } catch (_) {
-      $('#error').textContent = 'Não há espaço local disponível para salvar esta foto.';
+    const image = new Image();
+    image.onload = () => {
+      try {
+        localStorage.setItem('badge-photo-' + personId, reader.result);
+        if (selected?.id === personId) render(selected);
+      } catch (_) {
+        if (selected?.id !== personId) return;
+        $('#error').textContent = 'Não há espaço local disponível para salvar esta foto.';
+        $('#error').hidden = false;
+      }
+    };
+    image.onerror = () => {
+      if (selected?.id !== personId) return;
+      $('#error').textContent = 'O arquivo escolhido não é uma imagem válida.';
       $('#error').hidden = false;
-    }
+    };
+    image.src = reader.result;
+  };
+  reader.onerror = () => {
+    if (selected?.id !== personId) return;
+    $('#error').textContent = 'Não foi possível ler a imagem escolhida.';
+    $('#error').hidden = false;
   };
   reader.readAsDataURL(file);
 });

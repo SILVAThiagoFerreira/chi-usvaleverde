@@ -467,10 +467,11 @@ main { max-width: 1180px; margin: 26px auto 0; padding: 0 14px; }
   position: sticky;
   top: 0;
   z-index: 2;
-  background: #3b444d;
-  color: #fff;
+  background: #fff;
+  color: #38414a;
   font-size: 10px;
   font-weight: 700;
+  border-bottom: 2px solid #ead0d2;
 }
 .sheet-table th { vertical-align: top; }
 .column-filter {
@@ -480,7 +481,7 @@ main { max-width: 1180px; margin: 26px auto 0; padding: 0 14px; }
   height: 25px;
   margin-top: 6px;
   padding: 0 6px;
-  border: 1px solid #929aa1;
+  border: 1px solid #d2d8dd;
   border-radius: 3px;
   background: #fff;
   color: #283039;
@@ -506,6 +507,19 @@ main { max-width: 1180px; margin: 26px auto 0; padding: 0 14px; }
   color: #a10012;
   font-weight: 700;
 }
+.status-attention {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+.status-attention:focus-visible { outline: 2px solid #b5404e; outline-offset: 2px; }
+.status-days { margin-left: 8px; color: #775000; font-size: 10px; font-weight: 600; }
 .sheet-empty { padding: 22px; color: #707a83; font-size: 13px; }
 footer {
   max-width: 1180px;

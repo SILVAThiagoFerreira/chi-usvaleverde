@@ -217,47 +217,28 @@ function sheetData(table) {
   };
 }
 
-function trainingValidityDays() {
-  const data = sheetData(trainingTable);
-  const nameColumn = data.columns.findIndex(column => /nome.*treinamento/i.test(column.label));
-  const periodColumn = data.columns.findIndex(column => /validade/i.test(column.label));
-  const periods = new Map();
-  if (nameColumn < 0 || periodColumn < 0) return periods;
-  data.rows.forEach(row => {
-    const name = normalize(row[nameColumn]);
-    const months = Number(String(row[periodColumn]).replace(',', '.'));
-    if (name && Number.isFinite(months) && months > 0) periods.set(name, months * 30.4375);
-  });
-  return periods;
-}
-
 function statusForRow(row, columns, sourceRow) {
-  const periods = trainingValidityDays();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  let earliestRatio = Infinity;
-  let hasPeriod = false;
+  let earliestDays = Infinity;
   columns.forEach((column, displayIndex) => {
-    if (column.sourceIndex < 6 || column.sourceIndex > 70) return;
+    if (column.sourceIndex < 6 || column.sourceIndex > 69) return;
     const expiry = parseSheetDate(row[displayIndex]);
     if (!expiry) return;
-    let trainingName = normalize(column.label).replace(/^\d+\s+/, '');
-    trainingName = normalize(trainingName.replace(/^(?:validade do treinamento|autorizado a executar|autorizado a operar|autorizado a conduzir|autorizado a liberar|epi especial)\s*/i, ''));
-    const termDays = periods.get(trainingName);
-    if (!termDays) return;
-    hasPeriod = true;
-    const remainingDays = (expiry - today) / 86400000;
-    if (remainingDays <= 0) earliestRatio = -1;
-    else earliestRatio = Math.min(earliestRatio, remainingDays / termDays);
+    const remainingDays = Math.round((expiry.getTime() - today.getTime()) / 86400000);
+    earliestDays = Math.min(earliestDays, remainingDays);
   });
-  if (!hasPeriod) {
+  if (earliestDays === Infinity) {
     const sourceStatus = normalize(txt(sourceRow, 5));
-    if (sourceStatus === 'atencao') return 'ATENÇÃO';
-    if (sourceStatus === 'vencido') return 'VENCIDO';
-    if (sourceStatus === 'valido') return 'VÁLIDO';
-    return txt(sourceRow, 5);
+    const label = sourceStatus === 'atencao' ? 'ATENÇÃO'
+      : sourceStatus === 'vencido' ? 'VENCIDO'
+        : sourceStatus === 'valido' ? 'VÁLIDO' : txt(sourceRow, 5);
+    return { label, days: null };
   }
-  return earliestRatio <= 0 ? 'VENCIDO' : earliestRatio <= .2 ? 'ATENÇÃO' : 'VÁLIDO';
+  return {
+    label: earliestDays <= 0 ? 'VENCIDO' : earliestDays <= 30 ? 'ATENÇÃO' : 'VÁLIDO',
+    days: earliestDays
+  };
 }
 
 function sheetRows(table) {
@@ -289,7 +270,15 @@ function renderSheet() {
   const term = normalize($('#sheet-filter').value);
   const filters = sheetColumnFilters[activeSheet];
   const sourceRows = data.sourceRows;
-  const matches = allRows.map((row, index) => ({ row, sourceRow: sourceRows[index] }))
+  const statusIndex = activeSheet === 'Matriz'
+    ? data.columns.findIndex(column => column.sourceIndex === 5) : -1;
+  const preparedRows = allRows.map((row, index) => {
+    const status = statusIndex >= 0 ? statusForRow(row, data.columns, sourceRows[index]) : null;
+    const displayRow = row.slice();
+    if (statusIndex >= 0 && status.label) displayRow[statusIndex] = status.label;
+    return { row: displayRow, status };
+  });
+  const matches = preparedRows
     .filter(({ row }) => (!term || normalize(row.join(' ')).includes(term))
       && data.columns.every((column, index) => !filters[column.sourceIndex]
         || normalize(row[index]).includes(normalize(filters[column.sourceIndex]))));
@@ -305,13 +294,15 @@ function renderSheet() {
     + '<input class="column-filter" type="search" data-column="' + column.sourceIndex
     + '" value="' + esc(filters[column.sourceIndex] || '') + '" placeholder="Filtrar…" aria-label="Filtrar coluna ' + esc(column.label) + '"></th>'
   ).join('');
-  const body = matches.map(({ row, sourceRow }) => '<tr>' + row.map((value, index) => {
-    const status = activeSheet === 'Matriz' && data.columns[index].sourceIndex === 5
-      ? statusForRow(row, data.columns, sourceRow) : '';
-    const tone = normalize(status) === 'vencido' ? 'cell-expired'
-      : normalize(status) === 'atencao' ? 'cell-attention' : '';
-    return '<td' + (tone ? ' class="' + tone + '" title="' + esc(status) + '"' : '') + '>'
-      + esc(status || value) + '</td>';
+  const body = matches.map(({ row, status }) => '<tr>' + row.map((value, index) => {
+    const statusLabel = index === statusIndex ? status?.label || '' : '';
+    const tone = normalize(statusLabel) === 'vencido' ? 'cell-expired'
+      : normalize(statusLabel) === 'atencao' ? 'cell-attention' : '';
+    const attention = statusLabel === 'ATENÇÃO' && Number.isFinite(status.days)
+      ? '<button class="status-attention" type="button" aria-expanded="false" data-days="' + status.days
+        + '" aria-label="ATENÇÃO; clique para ver quantos dias faltam">ATENÇÃO</button>'
+        + '<span class="status-days" hidden></span>' : esc(statusLabel || value);
+    return '<td' + (tone ? ' class="' + tone + '"' : '') + '>' + attention + '</td>';
   }).join('') + '</tr>').join('');
   $('#sheet-content').innerHTML = '<table class="sheet-table"><thead><tr>' + headers
     + '</tr></thead><tbody>' + body + '</tbody></table>';
@@ -839,6 +830,15 @@ $('#sheet-content').addEventListener('input', event => {
   const replacement = $('#sheet-content').querySelector('.column-filter[data-column="' + column + '"]');
   replacement?.focus();
   replacement?.setSelectionRange(selection, selection);
+});
+$('#sheet-content').addEventListener('click', event => {
+  const button = event.target.closest('.status-attention');
+  if (!button) return;
+  const details = button.nextElementSibling;
+  const expanded = button.getAttribute('aria-expanded') === 'true';
+  button.setAttribute('aria-expanded', String(!expanded));
+  details.hidden = expanded;
+  details.textContent = 'Faltam ' + button.dataset.days + ' dias';
 });
 $('#sheet-dialog').addEventListener('click', event => {
   if (event.target === $('#sheet-dialog')) $('#sheet-dialog').close();

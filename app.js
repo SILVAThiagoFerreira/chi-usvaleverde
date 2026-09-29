@@ -612,8 +612,8 @@ async function badgeSvg(panel, person = selected) {
       + '<rect x="12" y="624" width="576" height="38" fill="#454c53"/>'
       + svgText(23, 650, 'AUTORIZADO A PORTAR', 16, 700, '#fff')
       + svgText(577, 650, 'SERIAL', 16, 700, '#fff', 'end')
-      + '<line x1="180" y1="730" x2="420" y2="730" stroke="#333" stroke-width="2"/>'
-      + svgText(300, 744, txt(row, 70) || 'T.I MVV', 16, 400, '#111', 'middle')
+      + '<line x1="180" y1="744" x2="420" y2="744" stroke="#333" stroke-width="2"/>'
+      + svgText(300, 759, txt(row, 70) || 'T.I MVV', 16, 400, '#111', 'middle')
       + '<rect x="12" y="780" width="576" height="104" fill="white" stroke="#333"/>'
       + '<line x1="180" y1="834" x2="420" y2="834" stroke="#333" stroke-width="2"/>'
       + svgText(300, 865, 'SSO MVV', 16, 400, '#111', 'middle');

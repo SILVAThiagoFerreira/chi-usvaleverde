@@ -390,6 +390,29 @@ main { max-width: 1180px; margin: 26px auto 0; padding: 0 14px; }
   color: #303944;
   background: #fff;
 }
+.pdf-dialog {
+  width: min(620px, 94vw);
+  max-width: none;
+  max-height: 86vh;
+  padding: 18px;
+  border: 1px solid #cfd4d8;
+  color: #303944;
+  background: #fff;
+}
+.pdf-dialog::backdrop { background: rgb(21 29 36 / 48%); }
+.pdf-hint { margin: 9px 0 12px; color: #68727b; font-size: 12px; }
+#pdf-search { width: 100%; height: 38px; padding: 0 10px; border: 1px solid var(--line); border-radius: 3px; font: inherit; }
+.pdf-selection-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.pdf-selection-actions .outline { height: 32px; font-size: 11px; }
+#pdf-selection-count { margin-left: auto; color: #65707a; font-size: 11px; }
+.pdf-staff-list { max-height: 48vh; overflow: auto; border: 1px solid var(--line); }
+.pdf-staff-option { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 7px 10px; border-bottom: 1px solid #e6e8ea; cursor: pointer; }
+.pdf-staff-option:last-child { border-bottom: 0; }
+.pdf-staff-option:hover { background: #fff6f6; }
+.pdf-staff-option input { accent-color: var(--red); width: 16px; height: 16px; }
+.pdf-staff-option span { display: grid; gap: 3px; }
+.pdf-staff-option b { font-size: 12px; }
+.pdf-staff-option small { color: #6d7780; font-size: 10px; }
 .sheet-auth-dialog::backdrop { background: rgb(21 29 36 / 48%); }
 #sheet-auth-form { display: grid; gap: 12px; }
 .sheet-auth-label { font-size: 12px; font-weight: 700; }
@@ -507,19 +530,11 @@ main { max-width: 1180px; margin: 26px auto 0; padding: 0 14px; }
   color: #a10012;
   font-weight: 700;
 }
-.status-attention {
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-  text-decoration: underline dotted;
-  text-underline-offset: 2px;
-}
-.status-attention:focus-visible { outline: 2px solid #b5404e; outline-offset: 2px; }
 .status-days { margin-left: 8px; color: #775000; font-size: 10px; font-weight: 600; }
+.status-tooltip { position: relative; cursor: help; text-decoration: underline dotted; text-underline-offset: 2px; }
+.cell-expired .status-tooltip .status-days { color: #a10012; }
+.status-tooltip .status-days { display: none; position: absolute; z-index: 5; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); margin: 0; padding: 7px 9px; border-radius: 4px; background: #303944; color: #fff; white-space: nowrap; box-shadow: 0 2px 8px rgb(0 0 0 / 20%); }
+.status-tooltip:hover .status-days, .status-tooltip:focus .status-days { display: block; }
 .sheet-empty { padding: 22px; color: #707a83; font-size: 13px; }
 footer {
   max-width: 1180px;
@@ -563,6 +578,7 @@ footer i {
   .primary, .outline { padding: 0 12px; }
   .sheet-dialog { width: 96vw; max-height: 90vh; padding: 12px; }
   .sheet-auth-dialog { padding: 14px; }
+  .pdf-dialog { padding: 14px; }
   .sheet-controls { align-items: stretch; flex-direction: column; gap: 6px; }
   .sheet-tabs { width: 100%; }
   .sheet-tab { flex: 1; padding: 0 5px; }

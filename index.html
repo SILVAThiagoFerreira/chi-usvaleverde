@@ -56,6 +56,14 @@
     </div>
     <div id="sheet-content" class="sheet-content" role="tabpanel" tabindex="0"></div>
   </dialog>
+  <dialog id="pdf-dialog" class="pdf-dialog" aria-labelledby="pdf-title">
+    <div class="sheet-head"><h2 id="pdf-title">Selecionar colaboradores para o PDF</h2><button id="pdf-close" class="close-sheet" type="button" aria-label="Fechar">×</button></div>
+    <p class="pdf-hint">Pesquise por nome ou registro e marque quem deve aparecer no arquivo.</p>
+    <input id="pdf-search" type="search" placeholder="Pesquisar nome ou registro" aria-label="Pesquisar nome ou registro">
+    <div class="pdf-selection-actions"><button id="pdf-select-visible" class="outline" type="button">Marcar exibidos</button><button id="pdf-clear" class="outline" type="button">Limpar seleção</button><span id="pdf-selection-count" role="status"></span></div>
+    <div id="pdf-staff-list" class="pdf-staff-list"></div>
+    <div class="sheet-auth-actions"><button id="pdf-cancel" class="outline" type="button">Cancelar</button><button id="pdf-generate" class="primary" type="button" disabled>Baixar PDF</button></div>
+  </dialog>
   <footer><i></i> HUB OPERACIONAL OPENBLAST</footer>
 </body>
 </html>

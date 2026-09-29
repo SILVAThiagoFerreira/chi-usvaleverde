@@ -11,6 +11,7 @@ let trainingLoading = false;
 let trainingLoadError = '';
 let activeSheet = 'Matriz';
 let selected = null;
+let pdfSelectedIds = new Set();
 let requestNo = 0;
 const sheetColumnFilters = { Matriz: {}, Treinamentos: {} };
 
@@ -301,10 +302,13 @@ function renderSheet() {
     const statusLabel = index === statusIndex ? status?.label || '' : '';
     const tone = normalize(statusLabel) === 'vencido' ? 'cell-expired'
       : normalize(statusLabel) === 'atencao' ? 'cell-attention' : '';
-    const attention = statusLabel === 'ATENÇÃO' && Number.isFinite(status.days)
-      ? '<button class="status-attention" type="button" aria-expanded="false" data-days="' + status.days
-        + '" aria-label="ATENÇÃO; clique para ver quantos dias faltam">ATENÇÃO</button>'
-        + '<span class="status-days" hidden></span>' : esc(statusLabel || value);
+    const daysText = !Number.isFinite(status?.days) ? '' : status.days > 0
+      ? 'Vence em ' + status.days + (status.days === 1 ? ' dia' : ' dias')
+      : status.days < 0 ? 'Vencido há ' + Math.abs(status.days) + (status.days === -1 ? ' dia' : ' dias')
+        : 'Vence hoje';
+    const attention = (statusLabel === 'ATENÇÃO' || statusLabel === 'VENCIDO') && daysText
+      ? '<span class="status-tooltip" tabindex="0" title="' + esc(daysText) + '" aria-label="' + esc(statusLabel + '. ' + daysText) + '">' + esc(statusLabel)
+        + '<span class="status-days" role="tooltip">' + esc(daysText) + '</span></span>' : esc(statusLabel || value);
     return '<td' + (tone ? ' class="' + tone + '"' : '') + '>' + attention + '</td>';
   }).join('') + '</tr>').join('');
   $('#sheet-content').innerHTML = '<table class="sheet-table"><thead><tr>' + headers
@@ -332,11 +336,17 @@ async function loadData() {
     if (photos && typeof photos === 'object' && !Array.isArray(photos)) photoMap = photos;
     matrixTable = matrix;
     window.__headers = matrix.cols.map(column => column.label || '');
-    staff = matrix.rows.map(row => ({ cells: row, id: txt(row, 0) })).filter(person => person.id);
+    staff = matrix.rows.map(row => ({ cells: row, id: txt(row, 0) }))
+      .filter(person => person.id && txt(person.cells, 1));
     setStatus('Dados carregados.');
     updateSuggestions();
     updateSheetLabels();
     $('#sheet-open').disabled = false;
+    if (!selected && staff.length) {
+      selected = staff[Math.floor(Math.random() * staff.length)];
+      $('#registro').value = selected.id;
+      render(selected);
+    }
     if ($('#sheet-dialog').open) renderSheet();
     if (selected) {
       const updated = staff.find(person => person.id === selected.id);
@@ -720,11 +730,12 @@ async function jpegBytes(panel, person) {
   return new Uint8Array(await blob.arrayBuffer());
 }
 
-function createPdf(images) {
+function createPdf(pages) {
   const encoder = new TextEncoder();
   const objects = [];
   objects[1] = encoder.encode('<< /Type /Catalog /Pages 2 0 R >>');
-  objects[2] = encoder.encode('<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
+  const pageIds = pages.map((_, index) => 3 + index * 4);
+  objects[2] = encoder.encode('<< /Type /Pages /Kids [' + pageIds.map(id => id + ' 0 R').join(' ') + '] /Count ' + pages.length + ' >>');
   const width = '595.276';
   const height = '841.890';
   const cardWidth = '138.898';
@@ -732,21 +743,26 @@ function createPdf(images) {
   const x1 = '28.346';
   const x2 = '171.779';
   const y = '615.402';
-  const content = encoder.encode('q\n' + cardWidth + ' 0 0 ' + cardHeight + ' ' + x1 + ' ' + y + ' cm\n/Front Do\nQ\n'
-    + 'q\n' + cardWidth + ' 0 0 ' + cardHeight + ' ' + x2 + ' ' + y + ' cm\n/Back Do\nQ\n');
-  objects[3] = encoder.encode('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + width + ' ' + height
-    + '] /Resources << /XObject << /Front 5 0 R /Back 6 0 R >> >> /Contents 4 0 R >>');
-  objects[4] = concatenate([encoder.encode('<< /Length ' + content.length + ' >>\nstream\n'), content, encoder.encode('endstream')]);
-  images.forEach((jpeg, index) => {
-    objects[5 + index] = concatenate([
-      encoder.encode('<< /Type /XObject /Subtype /Image /Width 2400 /Height 3600 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + jpeg.length + ' >>\nstream\n'),
-      jpeg, encoder.encode('\nendstream')
-    ]);
+  pages.forEach((images, index) => {
+    const pageId = 3 + index * 4, contentId = pageId + 1, frontId = pageId + 2, backId = pageId + 3;
+    const content = encoder.encode('q\n' + cardWidth + ' 0 0 ' + cardHeight + ' ' + x1 + ' ' + y + ' cm\n/Front Do\nQ\n'
+      + 'q\n' + cardWidth + ' 0 0 ' + cardHeight + ' ' + x2 + ' ' + y + ' cm\n/Back Do\nQ\n');
+    objects[pageId] = encoder.encode('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + width + ' ' + height
+      + '] /Resources << /XObject << /Front ' + frontId + ' 0 R /Back ' + backId + ' 0 R >> >> /Contents ' + contentId + ' 0 R >>');
+    objects[contentId] = concatenate([encoder.encode('<< /Length ' + content.length + ' >>\nstream\n'), content, encoder.encode('endstream')]);
+    images.forEach((jpeg, side) => {
+      const imageId = side === 0 ? frontId : backId;
+      objects[imageId] = concatenate([
+        encoder.encode('<< /Type /XObject /Subtype /Image /Width 2400 /Height 3600 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + jpeg.length + ' >>\nstream\n'),
+        jpeg, encoder.encode('\nendstream')
+      ]);
+    });
   });
   const parts = [encoder.encode('%PDF-1.4\n')];
   const offsets = [0];
   let length = parts[0].length;
-  for (let index = 1; index <= 6; index++) {
+  const objectCount = 2 + pages.length * 4;
+  for (let index = 1; index <= objectCount; index++) {
     offsets[index] = length;
     const head = encoder.encode(index + ' 0 obj\n');
     const tail = encoder.encode('\nendobj\n');
@@ -754,24 +770,45 @@ function createPdf(images) {
     length += head.length + objects[index].length + tail.length;
   }
   const xref = length;
-  let table = 'xref\n0 7\n0000000000 65535 f \n';
-  for (let index = 1; index <= 6; index++) table += String(offsets[index]).padStart(10, '0') + ' 00000 n \n';
-  table += 'trailer\n<< /Size 7 /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF';
+  let table = 'xref\n0 ' + (objectCount + 1) + '\n0000000000 65535 f \n';
+  for (let index = 1; index <= objectCount; index++) table += String(offsets[index]).padStart(10, '0') + ' 00000 n \n';
+  table += 'trailer\n<< /Size ' + (objectCount + 1) + ' /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF';
   parts.push(encoder.encode(table));
   return new Blob([concatenate(parts)], { type: 'application/pdf' });
 }
 
+function renderPdfStaff() {
+  const term = normalize($('#pdf-search').value);
+  const matches = staff.filter(person => normalize(person.id + ' ' + txt(person.cells, 1)).includes(term));
+  $('#pdf-staff-list').innerHTML = matches.map(person => '<label class="pdf-staff-option"><input type="checkbox" data-id="' + esc(person.id) + '"'
+    + (pdfSelectedIds.has(person.id) ? ' checked' : '') + '><span><b>' + esc(txt(person.cells, 1)) + '</b><small>Registro ' + esc(person.id) + '</small></span></label>').join('')
+    || '<div class="sheet-empty">Nenhum colaborador encontrado.</div>';
+  $('#pdf-selection-count').textContent = pdfSelectedIds.size + ' selecionado(s)';
+  $('#pdf-generate').disabled = !pdfSelectedIds.size;
+}
+
 async function exportPdf() {
-  const person = exportSnapshot();
-  if (!person) return;
-  const filenameId = String(person.id).replace(/[\\/:*?"<>|]/g, '_');
+  const people = staff.filter(person => pdfSelectedIds.has(person.id)).map(person => ({
+    id: person.id, cells: person.cells, photoSrc: photoSource(person.id, readStoredPhoto(person.id))
+  }));
+  if (!people.length) return;
+  const button = $('#pdf-generate');
+  button.disabled = true;
+  button.textContent = 'Preparando 0/' + people.length + '…';
   try {
-    const images = [];
-    for (const panel of [$('#front-card'), $('#back-card')]) images.push(await jpegBytes(panel, person));
-    download(URL.createObjectURL(createPdf(images)), 'cracha-' + filenameId + '.pdf');
+    const pages = [];
+    for (let index = 0; index < people.length; index++) {
+      pages.push(await Promise.all([jpegBytes($('#front-card'), people[index]), jpegBytes($('#back-card'), people[index])]));
+      button.textContent = 'Preparando ' + (index + 1) + '/' + people.length + '…';
+    }
+    download(URL.createObjectURL(createPdf(pages)), 'chi-colaboradores.pdf');
+    $('#pdf-dialog').close();
   } catch (error) {
     $('#error').textContent = error.message;
     $('#error').hidden = false;
+  } finally {
+    button.textContent = 'Baixar PDF';
+    renderPdfStaff();
   }
 }
 
@@ -834,19 +871,32 @@ $('#sheet-content').addEventListener('input', event => {
   replacement?.focus();
   replacement?.setSelectionRange(selection, selection);
 });
-$('#sheet-content').addEventListener('click', event => {
-  const button = event.target.closest('.status-attention');
-  if (!button) return;
-  const details = button.nextElementSibling;
-  const expanded = button.getAttribute('aria-expanded') === 'true';
-  button.setAttribute('aria-expanded', String(!expanded));
-  details.hidden = expanded;
-  details.textContent = 'Faltam ' + button.dataset.days + ' dias';
-});
 $('#sheet-dialog').addEventListener('click', event => {
   if (event.target === $('#sheet-dialog')) $('#sheet-dialog').close();
 });
-$('#pdf').addEventListener('click', exportPdf);
+$('#pdf').addEventListener('click', () => {
+  pdfSelectedIds = new Set(selected ? [selected.id] : []);
+  $('#pdf-search').value = '';
+  renderPdfStaff();
+  $('#pdf-dialog').showModal();
+  $('#pdf-search').focus();
+});
+$('#pdf-close').addEventListener('click', () => $('#pdf-dialog').close());
+$('#pdf-cancel').addEventListener('click', () => $('#pdf-dialog').close());
+$('#pdf-search').addEventListener('input', renderPdfStaff);
+$('#pdf-staff-list').addEventListener('change', event => {
+  const input = event.target.closest('input[data-id]');
+  if (!input) return;
+  if (input.checked) pdfSelectedIds.add(input.dataset.id);
+  else pdfSelectedIds.delete(input.dataset.id);
+  renderPdfStaff();
+});
+$('#pdf-select-visible').addEventListener('click', () => {
+  $('#pdf-staff-list').querySelectorAll('input[data-id]').forEach(input => pdfSelectedIds.add(input.dataset.id));
+  renderPdfStaff();
+});
+$('#pdf-clear').addEventListener('click', () => { pdfSelectedIds.clear(); renderPdfStaff(); });
+$('#pdf-generate').addEventListener('click', exportPdf);
 $('#png').addEventListener('click', exportPng);
 $('#photo').addEventListener('change', event => {
   const file = event.target.files?.[0];

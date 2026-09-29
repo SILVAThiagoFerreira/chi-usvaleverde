@@ -574,7 +574,7 @@ async function badgeSvg(panel, person = selected) {
     });
     const areas = restrictedAreas(row);
     areas.forEach((area, index) => {
-      const y = 594 + (167 / 4) * (index + .55);
+      const y = 614 + index * 26;
       svg += '<rect x="31" y="' + (y - 9) + '" width="10" height="10" fill="' + (area.active ? '#111' : '#fff') + '" stroke="#111" stroke-width="1"/>'
         + svgText(50, y, area.name, 18, 400)
         + svgText(397, y, area.date, 18, 700, '#111', 'end');

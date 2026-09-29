@@ -18,6 +18,6 @@ O workflow `.github/workflows/pages.yml` publica a raiz do repositório no GitHu
 ## Operação
 
 1. Digite o nome ou o número de registro e escolha uma sugestão ou **Buscar**.
-2. Use **Ver planilha** para consultar as abas `Matriz` e `Treinamentos` dentro do site. Pesquise globalmente ou filtre valores por coluna. O status geral da Matriz mostra atenção quando faltam até 30 dias para a validade mais próxima; clique em **ATENÇÃO** para ver os dias restantes. Após o vencimento, o status fica vermelho.
+2. Use **Ver planilha** para consultar as abas `Matriz` e `Treinamentos` dentro do site. Pesquise globalmente ou filtre valores por coluna. O status e as cores da Matriz acompanham o campo `STATUS` da planilha base; clique em **ATENÇÃO** para ver quantos dias faltam para a validade mais próxima.
 3. Se necessário, associe uma foto pelo botão **Foto**.
 4. Baixe o PDF em uma folha A4 retrato, com frente e verso lado a lado como na configuração de impressão da aba `Cracha` da planilha de referência; ou baixe um ZIP com os dois PNGs em alta resolução.

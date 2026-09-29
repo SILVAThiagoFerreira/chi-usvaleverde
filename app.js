@@ -222,22 +222,25 @@ function statusForRow(row, columns, sourceRow) {
   today.setHours(0, 0, 0, 0);
   let earliestDays = Infinity;
   columns.forEach((column, displayIndex) => {
-    if (column.sourceIndex < 6 || column.sourceIndex > 69) return;
-    const expiry = parseSheetDate(row[displayIndex]);
+    // The live Google Visualization feed currently exposes A:AB only. This is
+    // the same G:AB range used by its STATUS formula; later workbook columns
+    // are absent, so never infer the status from a partial date range.
+    if (column.sourceIndex < 6 || column.sourceIndex > 27) return;
+    const rawCell = sourceRow?.c?.[column.sourceIndex];
+    const expiry = parseSheetDate(rawCell?.v ?? rawCell?.f ?? row[displayIndex]);
     if (!expiry) return;
-    const remainingDays = Math.round((expiry.getTime() - today.getTime()) / 86400000);
+    const expiryDay = Date.UTC(expiry.getFullYear(), expiry.getMonth(), expiry.getDate());
+    const todayDay = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+    const remainingDays = Math.round((expiryDay - todayDay) / 86400000);
     earliestDays = Math.min(earliestDays, remainingDays);
   });
-  if (earliestDays === Infinity) {
-    const sourceStatus = normalize(txt(sourceRow, 5));
-    const label = sourceStatus === 'atencao' ? 'ATENÇÃO'
-      : sourceStatus === 'vencido' ? 'VENCIDO'
-        : sourceStatus === 'valido' ? 'VÁLIDO' : txt(sourceRow, 5);
-    return { label, days: null };
-  }
+  const sourceStatus = normalize(txt(sourceRow, 5));
+  const label = sourceStatus === 'atencao' ? 'ATENÇÃO'
+    : sourceStatus === 'vencido' ? 'VENCIDO'
+      : sourceStatus === 'valido' ? 'VÁLIDO' : txt(sourceRow, 5);
   return {
-    label: earliestDays <= 0 ? 'VENCIDO' : earliestDays <= 30 ? 'ATENÇÃO' : 'VÁLIDO',
-    days: earliestDays
+    label,
+    days: earliestDays === Infinity ? null : earliestDays
   };
 }
 

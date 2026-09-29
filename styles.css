@@ -341,10 +341,15 @@ main { max-width: 1180px; margin: 26px auto 0; padding: 0 14px; }
   height: 43px;
   border: 1px solid #333;
   border-top: 0;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
   font-size: 6px;
 }
+.license span { width: 58%; border-top: 1px solid #333; }
+.license b { font-size: 6px; font-weight: 400; }
 .signature {
   height: 40px;
   border: 1px solid #333;

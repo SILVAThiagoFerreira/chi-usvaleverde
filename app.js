@@ -12,6 +12,7 @@ let trainingLoadError = '';
 let activeSheet = 'Matriz';
 let selected = null;
 let requestNo = 0;
+const sheetColumnFilters = { Matriz: {}, Treinamentos: {} };
 
 const txt = (row, index) => String(Array.isArray(row)
   ? row[index] ?? ''
@@ -209,10 +210,48 @@ function sheetData(table) {
   const rows = values.map(row => indexes.map(({ index }) => row[index])).filter(row => row.some(Boolean));
   return {
     columns: indexes.map(({ column, index }) => ({
-      label: column.label || ('Coluna ' + (index + 1))
+      label: column.label || ('Coluna ' + (index + 1)), sourceIndex: index
     })),
-    rows
+    rows,
+    sourceRows: table.rows.filter((_, rowIndex) => values[rowIndex].some(Boolean))
   };
+}
+
+function trainingValidityDays() {
+  const data = sheetData(trainingTable);
+  const nameColumn = data.columns.findIndex(column => /nome.*treinamento/i.test(column.label));
+  const periodColumn = data.columns.findIndex(column => /validade/i.test(column.label));
+  const periods = new Map();
+  if (nameColumn < 0 || periodColumn < 0) return periods;
+  data.rows.forEach(row => {
+    const name = normalize(row[nameColumn]);
+    const months = Number(String(row[periodColumn]).replace(',', '.'));
+    if (name && Number.isFinite(months) && months > 0) periods.set(name, months * 30.4375);
+  });
+  return periods;
+}
+
+function statusForRow(row, columns, sourceRow) {
+  const periods = trainingValidityDays();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let earliestRatio = Infinity;
+  let hasPeriod = false;
+  columns.forEach((column, displayIndex) => {
+    if (column.sourceIndex < 6 || column.sourceIndex > 70) return;
+    const expiry = parseSheetDate(row[displayIndex]);
+    if (!expiry) return;
+    let trainingName = normalize(column.label).replace(/^\d+\s+/, '');
+    trainingName = normalize(trainingName.replace(/^(?:validade do treinamento|autorizado a executar|autorizado a operar|autorizado a conduzir|autorizado a liberar|epi especial)\s*/i, ''));
+    const termDays = periods.get(trainingName);
+    if (!termDays) return;
+    hasPeriod = true;
+    const remainingDays = (expiry - today) / 86400000;
+    if (remainingDays <= 0) earliestRatio = -1;
+    else earliestRatio = Math.min(earliestRatio, remainingDays / termDays);
+  });
+  if (!hasPeriod) return normalize(txt(sourceRow, 5));
+  return earliestRatio <= 0 ? 'VENCIDO' : earliestRatio <= .2 ? 'ATENÇÃO' : 'VÁLIDO';
 }
 
 function sheetRows(table) {
@@ -242,9 +281,13 @@ function renderSheet() {
   const data = sheetData(table);
   const allRows = data.rows;
   const term = normalize($('#sheet-filter').value);
-  const rows = term
-    ? allRows.filter(row => normalize(row.join(' ')).includes(term))
-    : allRows;
+  const filters = sheetColumnFilters[activeSheet];
+  const sourceRows = data.sourceRows;
+  const matches = allRows.map((row, index) => ({ row, sourceRow: sourceRows[index] }))
+    .filter(({ row }) => (!term || normalize(row.join(' ')).includes(term))
+      && data.columns.every((column, index) => !filters[column.sourceIndex]
+        || normalize(row[index]).includes(normalize(filters[column.sourceIndex]))));
+  const rows = matches.map(item => item.row);
   $('#sheet-tab-matrix').setAttribute('aria-selected', String(activeSheet === 'Matriz'));
   $('#sheet-tab-training').setAttribute('aria-selected', String(activeSheet === 'Treinamentos'));
   $('#sheet-count').textContent = rows.length + ' / ' + allRows.length;
@@ -252,12 +295,18 @@ function renderSheet() {
     $('#sheet-content').innerHTML = '<div class="sheet-empty">Nenhuma linha encontrada.</div>';
     return;
   }
-  const headers = data.columns.map(column =>
-    '<th scope="col">' + esc(column.label) + '</th>'
+  const headers = data.columns.map(column => '<th scope="col">' + esc(column.label)
+    + '<input class="column-filter" type="search" data-column="' + column.sourceIndex
+    + '" value="' + esc(filters[column.sourceIndex] || '') + '" placeholder="Filtrar…" aria-label="Filtrar coluna ' + esc(column.label) + '"></th>'
   ).join('');
-  const body = rows.map(row => '<tr>' + row.map(value =>
-    '<td>' + esc(value) + '</td>'
-  ).join('') + '</tr>').join('');
+  const body = matches.map(({ row, sourceRow }) => '<tr>' + row.map((value, index) => {
+    const status = activeSheet === 'Matriz' && data.columns[index].sourceIndex === 5
+      ? statusForRow(row, data.columns, sourceRow) : '';
+    const tone = normalize(status) === 'vencido' ? 'cell-expired'
+      : normalize(status) === 'atencao' ? 'cell-attention' : '';
+    return '<td' + (tone ? ' class="' + tone + '" title="' + esc(status) + '"' : '') + '>'
+      + esc(status || value) + '</td>';
+  }).join('') + '</tr>').join('');
   $('#sheet-content').innerHTML = '<table class="sheet-table"><thead><tr>' + headers
     + '</tr></thead><tbody>' + body + '</tbody></table>';
 }
@@ -595,17 +644,61 @@ async function exportPng() {
   if (!person) return;
   const filenameId = String(person.id).replace(/[\\/:*?"<>|]/g, '_');
   try {
+    const files = [];
     for (const [panel, side] of [[$('#front-card'), 'frente'], [$('#back-card'), 'verso']]) {
       const canvas = await cardCanvas(panel, person);
       const blob = await new Promise((resolve, reject) =>
         canvas.toBlob(file => file ? resolve(file) : reject(new Error('Falha ao gerar imagem.')), 'image/png')
       );
-      download(URL.createObjectURL(blob), 'cracha-' + filenameId + '-' + side + '.png');
+      files.push({ name: 'cracha-' + filenameId + '-' + side + '.png', bytes: new Uint8Array(await blob.arrayBuffer()) });
     }
+    download(URL.createObjectURL(createZip(files)), 'cracha-' + filenameId + '.zip');
   } catch (error) {
     $('#error').textContent = error.message;
     $('#error').hidden = false;
   }
+}
+
+function crc32(bytes) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function put16(view, offset, value) { view.setUint16(offset, value, true); }
+function put32(view, offset, value) { view.setUint32(offset, value >>> 0, true); }
+
+function createZip(files) {
+  const encoder = new TextEncoder();
+  const localParts = [];
+  const centralParts = [];
+  let localOffset = 0;
+  for (const file of files) {
+    const name = encoder.encode(file.name);
+    const crc = crc32(file.bytes);
+    const local = new Uint8Array(30 + name.length);
+    const lv = new DataView(local.buffer);
+    put32(lv, 0, 0x04034b50); put16(lv, 4, 20); put16(lv, 6, 0x0800);
+    put16(lv, 8, 0); put32(lv, 14, crc); put32(lv, 18, file.bytes.length);
+    put32(lv, 22, file.bytes.length); put16(lv, 26, name.length); local.set(name, 30);
+    localParts.push(local, file.bytes);
+    const central = new Uint8Array(46 + name.length);
+    const cv = new DataView(central.buffer);
+    put32(cv, 0, 0x02014b50); put16(cv, 4, 20); put16(cv, 6, 20); put16(cv, 8, 0x0800);
+    put16(cv, 10, 0); put32(cv, 16, crc); put32(cv, 20, file.bytes.length);
+    put32(cv, 24, file.bytes.length); put16(cv, 28, name.length); put32(cv, 42, localOffset);
+    central.set(name, 46); centralParts.push(central);
+    localOffset += local.length + file.bytes.length;
+  }
+  const centralDirectory = concatenate(centralParts);
+  const end = new Uint8Array(22);
+  const ev = new DataView(end.buffer);
+  put32(ev, 0, 0x06054b50); put16(ev, 8, files.length); put16(ev, 10, files.length);
+  put32(ev, 12, centralDirectory.length); put32(ev, 16, localOffset);
+  return new Blob([concatenate([...localParts, centralDirectory, end])], { type: 'application/zip' });
 }
 
 function concatenate(parts) {
@@ -631,32 +724,29 @@ function createPdf(images) {
   const encoder = new TextEncoder();
   const objects = [];
   objects[1] = encoder.encode('<< /Type /Catalog /Pages 2 0 R >>');
-  objects[2] = encoder.encode('<< /Type /Pages /Kids [3 0 R 6 0 R] /Count 2 >>');
-  const width = (54 * 72 / 25.4).toFixed(3);
-  const height = (81 * 72 / 25.4).toFixed(3);
-  for (let page = 0; page < 2; page++) {
-    const pageObject = 3 + page * 3;
-    const contentObject = pageObject + 1;
-    const imageObject = pageObject + 2;
-    const jpeg = images[page];
-    const content = encoder.encode('q\n' + width + ' 0 0 ' + height + ' 0 0 cm\n/Im0 Do\nQ\n');
-    objects[pageObject] = encoder.encode('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + width + ' ' + height
-      + '] /Resources << /XObject << /Im0 ' + imageObject + ' 0 R >> >> /Contents ' + contentObject + ' 0 R >>');
-    objects[contentObject] = concatenate([
-      encoder.encode('<< /Length ' + content.length + ' >>\nstream\n'),
-      content,
-      encoder.encode('endstream')
-    ]);
-    objects[imageObject] = concatenate([
+  objects[2] = encoder.encode('<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
+  const width = '595.276';
+  const height = '841.890';
+  const cardWidth = '138.898';
+  const cardHeight = '208.346';
+  const x1 = '28.346';
+  const x2 = '171.779';
+  const y = '615.402';
+  const content = encoder.encode('q\n' + cardWidth + ' 0 0 ' + cardHeight + ' ' + x1 + ' ' + y + ' cm\n/Front Do\nQ\n'
+    + 'q\n' + cardWidth + ' 0 0 ' + cardHeight + ' ' + x2 + ' ' + y + ' cm\n/Back Do\nQ\n');
+  objects[3] = encoder.encode('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + width + ' ' + height
+    + '] /Resources << /XObject << /Front 5 0 R /Back 6 0 R >> >> /Contents 4 0 R >>');
+  objects[4] = concatenate([encoder.encode('<< /Length ' + content.length + ' >>\nstream\n'), content, encoder.encode('endstream')]);
+  images.forEach((jpeg, index) => {
+    objects[5 + index] = concatenate([
       encoder.encode('<< /Type /XObject /Subtype /Image /Width 2400 /Height 3600 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + jpeg.length + ' >>\nstream\n'),
-      jpeg,
-      encoder.encode('\nendstream')
+      jpeg, encoder.encode('\nendstream')
     ]);
-  }
+  });
   const parts = [encoder.encode('%PDF-1.4\n')];
   const offsets = [0];
   let length = parts[0].length;
-  for (let index = 1; index <= 8; index++) {
+  for (let index = 1; index <= 6; index++) {
     offsets[index] = length;
     const head = encoder.encode(index + ' 0 obj\n');
     const tail = encoder.encode('\nendobj\n');
@@ -664,9 +754,9 @@ function createPdf(images) {
     length += head.length + objects[index].length + tail.length;
   }
   const xref = length;
-  let table = 'xref\n0 9\n0000000000 65535 f \n';
-  for (let index = 1; index <= 8; index++) table += String(offsets[index]).padStart(10, '0') + ' 00000 n \n';
-  table += 'trailer\n<< /Size 9 /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF';
+  let table = 'xref\n0 7\n0000000000 65535 f \n';
+  for (let index = 1; index <= 6; index++) table += String(offsets[index]).padStart(10, '0') + ' 00000 n \n';
+  table += 'trailer\n<< /Size 7 /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF';
   parts.push(encoder.encode(table));
   return new Blob([concatenate(parts)], { type: 'application/pdf' });
 }
@@ -733,6 +823,17 @@ $('#sheet-tab-training').addEventListener('click', () => {
   renderSheet();
 });
 $('#sheet-filter').addEventListener('input', renderSheet);
+$('#sheet-content').addEventListener('input', event => {
+  const input = event.target.closest('.column-filter');
+  if (!input) return;
+  const column = input.dataset.column;
+  sheetColumnFilters[activeSheet][column] = input.value;
+  const selection = input.selectionStart;
+  renderSheet();
+  const replacement = $('#sheet-content').querySelector('.column-filter[data-column="' + column + '"]');
+  replacement?.focus();
+  replacement?.setSelectionRange(selection, selection);
+});
 $('#sheet-dialog').addEventListener('click', event => {
   if (event.target === $('#sheet-dialog')) $('#sheet-dialog').close();
 });

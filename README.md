@@ -1,6 +1,6 @@
 # Crachá | US Vale Verde
 
-Aplicação estática para localizar um colaborador pelo nome ou registro e gerar a frente e o verso do crachá em PDF ou PNG de alta resolução.
+Aplicação estática para localizar um colaborador pelo nome ou registro e gerar a frente e o verso do crachá em PDF ou em PNGs de alta resolução compactados em ZIP.
 
 ## Dados
 
@@ -18,6 +18,6 @@ O workflow `.github/workflows/pages.yml` publica a raiz do repositório no GitHu
 ## Operação
 
 1. Digite o nome ou o número de registro e escolha uma sugestão ou **Buscar**.
-2. Use **Ver planilha** para consultar as abas `Matriz` e `Treinamentos` dentro do site.
+2. Use **Ver planilha** para consultar as abas `Matriz` e `Treinamentos` dentro do site. Pesquise globalmente ou filtre valores por coluna. O status geral da Matriz considera atenção quando resta até 20% do período cadastrado para o treinamento vencer e vencido após a data de validade.
 3. Se necessário, associe uma foto pelo botão **Foto**.
-4. Baixe o PDF (frente e verso) ou os dois PNGs em alta resolução.
+4. Baixe o PDF em uma folha A4 retrato, com frente e verso lado a lado como na configuração de impressão da aba `Cracha` da planilha de referência; ou baixe um ZIP com os dois PNGs em alta resolução.

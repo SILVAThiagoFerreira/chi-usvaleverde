@@ -399,7 +399,7 @@ function render(item) {
 
   const areas = restrictedAreas(row);
   const areaRows = areas.map(area =>
-    '<li aria-label="' + esc(area.name + (area.active ? ', acesso válido até ' + area.date : ', sem autorização vigente')) + '"><span class="area-status" aria-hidden="true">' + (area.active ? 'X' : '') + '</span>' +
+    '<li aria-label="' + esc(area.name + (area.active ? ', acesso válido até ' + area.date : ', sem autorização vigente')) + '"><span class="area-status' + (area.active ? ' is-active' : '') + '" aria-hidden="true"></span>' +
       '<span class="area-name">' + esc(area.name) + '</span><b>' + esc(area.date) + '</b></li>'
   ).join('');
   const validityRows = documentValidity(row).map(entry =>
@@ -575,8 +575,7 @@ async function badgeSvg(panel, person = selected) {
     const areas = restrictedAreas(row);
     areas.forEach((area, index) => {
       const y = 594 + (167 / 4) * (index + .55);
-      svg += '<rect x="31" y="' + (y - 9) + '" width="10" height="10" fill="white" stroke="#111" stroke-width="1" stroke-dasharray="2 1"/>'
-        + (area.active ? svgText(36, y - 1, 'X', 8, 700, '#111', 'middle') : '')
+      svg += '<rect x="31" y="' + (y - 9) + '" width="10" height="10" fill="' + (area.active ? '#111' : '#fff') + '" stroke="#111" stroke-width="1"/>'
         + svgText(50, y, area.name, 18, 400)
         + svgText(397, y, area.date, 18, 700, '#111', 'end');
     });
@@ -730,38 +729,61 @@ async function jpegBytes(panel, person) {
   return new Uint8Array(await blob.arrayBuffer());
 }
 
-function createPdf(pages) {
+function createPdf(sheets) {
   const encoder = new TextEncoder();
-  const objects = [];
-  objects[1] = encoder.encode('<< /Type /Catalog /Pages 2 0 R >>');
-  const pageIds = pages.map((_, index) => 3 + index * 4);
-  objects[2] = encoder.encode('<< /Type /Pages /Kids [' + pageIds.map(id => id + ' 0 R').join(' ') + '] /Count ' + pages.length + ' >>');
-  const width = '595.276';
-  const height = '841.890';
-  const cardWidth = '138.898';
-  const cardHeight = '208.346';
-  const x1 = '28.346';
-  const x2 = '171.779';
-  const y = '615.402';
-  pages.forEach((images, index) => {
-    const pageId = 3 + index * 4, contentId = pageId + 1, frontId = pageId + 2, backId = pageId + 3;
-    const content = encoder.encode('q\n' + cardWidth + ' 0 0 ' + cardHeight + ' ' + x1 + ' ' + y + ' cm\n/Front Do\nQ\n'
-      + 'q\n' + cardWidth + ' 0 0 ' + cardHeight + ' ' + x2 + ' ' + y + ' cm\n/Back Do\nQ\n');
-    objects[pageId] = encoder.encode('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + width + ' ' + height
-      + '] /Resources << /XObject << /Front ' + frontId + ' 0 R /Back ' + backId + ' 0 R >> >> /Contents ' + contentId + ' 0 R >>');
-    objects[contentId] = concatenate([encoder.encode('<< /Length ' + content.length + ' >>\nstream\n'), content, encoder.encode('endstream')]);
-    images.forEach((jpeg, side) => {
-      const imageId = side === 0 ? frontId : backId;
-      objects[imageId] = concatenate([
-        encoder.encode('<< /Type /XObject /Subtype /Image /Width 2400 /Height 3600 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + jpeg.length + ' >>\nstream\n'),
-        jpeg, encoder.encode('\nendstream')
-      ]);
+  const objects = [null, encoder.encode('<< /Type /Catalog /Pages 2 0 R >>'), null];
+  const pageIds = [];
+  const ptPerMm = 72 / 25.4;
+  const pageWidth = 297 * ptPerMm;
+  const pageHeight = 210 * ptPerMm;
+  const cardWidth = 54 * ptPerMm;
+  const cardHeight = 81 * ptPerMm;
+  const pairGap = 6 * ptPerMm;
+  const pairWidth = cardWidth * 2 + pairGap;
+  const columnGap = 8 * ptPerMm;
+  const rowGap = 10 * ptPerMm;
+
+  sheets.forEach(pairs => {
+    const pageId = objects.length;
+    objects.push(null);
+    pageIds.push(pageId);
+    const contentId = objects.length;
+    objects.push(null);
+    const resourceRefs = [];
+    const commands = [];
+    const rows = Math.ceil(pairs.length / 2);
+    const contentHeight = rows * cardHeight + (rows - 1) * rowGap;
+    const topMargin = (pageHeight - contentHeight) / 2;
+    pairs.forEach((pair, index) => {
+      const row = Math.floor(index / 2);
+      const isCenteredLastPair = pairs.length % 2 === 1 && index === pairs.length - 1;
+      const x = isCenteredLastPair
+        ? (pageWidth - pairWidth) / 2
+        : (pageWidth - (pairWidth * 2 + columnGap)) / 2 + (index % 2) * (pairWidth + columnGap);
+      const y = pageHeight - topMargin - cardHeight - row * (cardHeight + rowGap);
+      const names = ['Front' + index, 'Back' + index];
+      pair.forEach((jpeg, side) => {
+        const imageId = objects.length;
+        const name = names[side];
+        resourceRefs.push('/' + name + ' ' + imageId + ' 0 R');
+        objects.push(concatenate([
+          encoder.encode('<< /Type /XObject /Subtype /Image /Width 2400 /Height 3600 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + jpeg.length + ' >>\nstream\n'),
+          jpeg, encoder.encode('\nendstream')
+        ]));
+        const imageX = x + (side === 0 ? 0 : cardWidth + pairGap);
+        commands.push('q\n' + cardWidth + ' 0 0 ' + cardHeight + ' ' + imageX + ' ' + y + ' cm\n/' + name + ' Do\nQ\n');
+      });
     });
+    const content = encoder.encode(commands.join(''));
+    objects[contentId] = concatenate([encoder.encode('<< /Length ' + content.length + ' >>\nstream\n'), content, encoder.encode('endstream')]);
+    objects[pageId] = encoder.encode('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + pageWidth.toFixed(3) + ' ' + pageHeight.toFixed(3)
+      + '] /Resources << /XObject << ' + resourceRefs.join(' ') + ' >> >> /Contents ' + contentId + ' 0 R >>');
   });
+  objects[2] = encoder.encode('<< /Type /Pages /Kids [' + pageIds.map(id => id + ' 0 R').join(' ') + '] /Count ' + pageIds.length + ' >>');
   const parts = [encoder.encode('%PDF-1.4\n')];
   const offsets = [0];
   let length = parts[0].length;
-  const objectCount = 2 + pages.length * 4;
+  const objectCount = objects.length - 1;
   for (let index = 1; index <= objectCount; index++) {
     offsets[index] = length;
     const head = encoder.encode(index + ' 0 obj\n');
@@ -796,12 +818,14 @@ async function exportPdf() {
   button.disabled = true;
   button.textContent = 'Preparando 0/' + people.length + '…';
   try {
-    const pages = [];
+    const pairs = [];
     for (let index = 0; index < people.length; index++) {
-      pages.push(await Promise.all([jpegBytes($('#front-card'), people[index]), jpegBytes($('#back-card'), people[index])]));
+      pairs.push(await Promise.all([jpegBytes($('#front-card'), people[index]), jpegBytes($('#back-card'), people[index])]));
       button.textContent = 'Preparando ' + (index + 1) + '/' + people.length + '…';
     }
-    download(URL.createObjectURL(createPdf(pages)), 'chi-colaboradores.pdf');
+    const sheets = [];
+    for (let index = 0; index < pairs.length; index += 4) sheets.push(pairs.slice(index, index + 4));
+    download(URL.createObjectURL(createPdf(sheets)), 'chi-colaboradores.pdf');
     $('#pdf-dialog').close();
   } catch (error) {
     $('#error').textContent = error.message;

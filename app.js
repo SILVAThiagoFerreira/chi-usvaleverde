@@ -1,5 +1,6 @@
 const SHEET_ID = '1R4h8YtBFPDzD70DlNZQ88C7nJ9Gd9Yfd';
 const API = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/gviz/tq';
+const SHEET_EDIT_URL = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/edit';
 const $ = selector => document.querySelector(selector);
 
 let staff = [];
@@ -85,6 +86,69 @@ function formatMonthYear(value) {
   return month ? month + '-' + match[2].slice(-2) : text;
 }
 
+function parseSheetDate(value) {
+  const text = String(value ?? '').trim();
+  if (!text || /^(?:00\/01\/1900|01\/00\/1900|0{1,2}\/0{1,2}\/1900)$/i.test(text)) return null;
+
+  let parts = text.match(/^Date\((\d{4}),(\d{1,2}),(\d{1,2})/i);
+  if (parts) return new Date(Number(parts[1]), Number(parts[2]), Number(parts[3]));
+
+  parts = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (parts) return new Date(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3]));
+
+  parts = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!parts) return null;
+  const first = Number(parts[1]);
+  const second = Number(parts[2]);
+  const monthFirst = first <= 12 && second <= 12 ? true : first <= 12;
+  const month = monthFirst ? first : second;
+  const day = monthFirst ? second : first;
+  const date = new Date(Number(parts[3]), month - 1, day);
+  return date.getMonth() === month - 1 && date.getDate() === day ? date : null;
+}
+
+function accessIsCurrent(value) {
+  const expiry = parseSheetDate(value);
+  if (!expiry) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return expiry > today;
+}
+
+function restrictedAreas(row) {
+  const labels = ['SE', 'MINA', 'PAIOL', 'BRR'];
+  return labels.map((fallback, offset) => {
+    const value = txt(row, offset + 11);
+    const name = headerName(offset + 11).replace(/^MIN$/i, 'MINA') || fallback;
+    return {
+      name,
+      date: formatMonthYear(value),
+      active: accessIsCurrent(value)
+    };
+  });
+}
+
+function documentValidity(row) {
+  return [
+    { value: formatDate(txt(row, 7)) },
+    { label: 'INTEGR. VAL' },
+    { value: formatDate(txt(row, 6)) },
+    { label: 'CNH VAL.' },
+    { value: formatDate(txt(row, 10)) }
+  ];
+}
+
+function canonicalTrainingName(value) {
+  const name = String(value ?? '').trim();
+  const knownLabels = {
+    'nr22 introdutorio mvv': 'NR-22 Introdutório MVV',
+    'nr35 - trabalho em altura': 'NR35 Trabalho em Altura 8h',
+    'nr35 trabalho em altura 8h': 'NR35 Trabalho em Altura 8h',
+    'nr11 mini carregadeira': 'NR 11 Mini Carregadeira'
+  };
+  return knownLabels[normalize(name)] || name;
+}
+
 function headerName(index) {
   const name = String(window.__headers?.[index] || '').replace(/^\d+\s+/, '').trim();
   return name.replace(/^(?:DADOS GERAIS DO FUNCIONÁRIO|VALIDADE DO TREINAMENTO|AREAS RESTRITAS|AUTORIZADO A EXECUTAR|AUTORIZADO A OPERAR|AUTORIZADO A LIBERAR|EPI ESPECIAL|AUTORIZADO A PORTAR)\s*/i, '').trim();
@@ -101,7 +165,7 @@ function readGroups(row) {
   return ranges.map(group => ({
     title: group.title,
     items: group.indices.map(index => ({
-      name: headerName(index),
+      name: canonicalTrainingName(headerName(index)),
       date: formatDate(txt(row, index))
     })).filter(item => item.name && item.date)
   })).filter(group => group.items.length);
@@ -272,21 +336,16 @@ function render(item) {
     ? '<img class="portrait" crossorigin="anonymous" alt="Foto de ' + esc(name) + '" src="' + esc(photoSrc) + '" onerror="this.classList.add(\'photo-failed\')">'
     : '<div class="portrait photo-empty" role="img" aria-label="Foto não cadastrada">FOTO</div>';
 
-  const areas = [11, 12, 13, 14].map(index => ({
-    name: headerName(index).replace(/^MIN$/i, 'MINA'),
-    date: formatMonthYear(txt(row, index))
-  })).filter(area => area.name && area.date);
+  const areas = restrictedAreas(row);
   const areaRows = areas.map(area =>
-    '<li><span>' + esc(area.name) + '</span><b>' + esc(area.date) + '</b></li>'
-  ).join('') || '<li class="no-area">—</li>';
-  const validity = [
-    ['ASO', formatDate(txt(row, 7))],
-    ['INTEGR. VAL', formatDate(txt(row, 6))],
-    ['CNH VAL.', formatDate(txt(row, 10))]
-  ].filter(([, date]) => date);
-  const validityRows = validity.map(([label, date]) =>
-    '<li><b>' + esc(label) + '</b><span>' + esc(date) + '</span></li>'
-  ).join('') || '<li><span>—</span></li>';
+    '<li aria-label="' + esc(area.name + (area.active ? ', acesso válido até ' + area.date : ', sem autorização vigente')) + '"><span class="area-status" aria-hidden="true">' + (area.active ? 'X' : '') + '</span>' +
+      '<span class="area-name">' + esc(area.name) + '</span><b>' + esc(area.date) + '</b></li>'
+  ).join('');
+  const validityRows = documentValidity(row).map(entry =>
+    entry.label
+      ? '<li><b>' + esc(entry.label) + '</b></li>'
+      : '<li><span>' + esc(entry.value) + '</span></li>'
+  ).join('');
 
   $('#front-card').innerHTML =
     '<section class="front-panel">' +
@@ -303,10 +362,10 @@ function render(item) {
       '</div>' +
       '<div class="microgrid">' + field('EMPRESA', txt(row, 3)) + field('SETOR', txt(row, 4)) + '</div>' +
       '<section class="restricted">' +
-        '<div class="restricted-areas"><div class="restricted-heading"><b>ÁREAS RESTRITAS</b><span>VALIDADE</span></div><ul>' + areaRows + '</ul></div>' +
-        '<div class="validity-column"><div class="restricted-heading"><b>DOCUMENTOS</b><span>VALIDADE</span></div><ul>' + validityRows + '</ul></div>' +
+        '<div class="restricted-areas"><div class="restricted-heading"><b>AREAS RESTRITAS</b></div><ul>' + areaRows + '</ul></div>' +
+        '<div class="validity-column"><div class="restricted-heading"><b>ASO</b></div><ul>' + validityRows + '</ul></div>' +
       '</section>' +
-      '<div class="validity">CONTROLE DE HABILITAÇÃO INTERNA<br>(C.H.I.)</div>' +
+      '<div class="validity">CONTROLE DE HABILITAÇÃO INTERNA<br>(C.H.I)</div>' +
     '</section>';
 
   const groups = readGroups(row);
@@ -318,13 +377,13 @@ function render(item) {
       ).join('') + '</ul>' +
     '</section>'
   ).join('') || '<div class="permission-empty">—</div>';
-  const serial = txt(row, 70) || 'T.I. MVV';
+  const serial = txt(row, 70) || 'T.I MVV';
   $('#back-card').innerHTML =
     '<section class="back-panel"><div class="permissions">' + training + '</div>' +
       '<div class="authorization">' +
         '<div class="back-head"><span>AUTORIZADO A PORTAR</span><b>SERIAL</b></div>' +
         '<div class="license">' + esc(serial) + '</div>' +
-        '<div class="signature"><span></span><b>SSO MVVV</b></div>' +
+        '<div class="signature"><span></span><b>SSO MVV</b></div>' +
       '</div>' +
     '</section>';
 
@@ -372,14 +431,16 @@ function search() {
 }
 
 const svgText = (x, y, value, size = 18, weight = 400, color = '#111', anchor = 'start') =>
-  '<text x="' + x + '" y="' + y + '" font-family="Arial,Helvetica,sans-serif" font-size="' + size
+  '<text x="' + x + '" y="' + y + '" font-family="Calibri,Arial,Helvetica,sans-serif" font-size="' + size
   + '" font-weight="' + weight + '" fill="' + color + '" text-anchor="' + anchor + '">' + xml(value) + '</text>';
 const truncate = (value, limit) => String(value || '—').length > limit
   ? String(value || '—').slice(0, limit - 1) + '…' : String(value || '—');
-const svgField = (x, y, width, height, label, value, size = 18) =>
-  '<rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height + '" fill="white" stroke="#222"/>'
-  + svgText(x + 9, y + 22, label, 14, 700)
-  + svgText(x + 9, y + 50, truncate(value, 33), size, 400);
+const svgField = (x, y, width, height, label, value, size = 20) => {
+  const compact = height <= 70;
+  return '<rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height + '" fill="white" stroke="#222"/>'
+    + svgText(x + 9, y + (compact ? 18 : 22), label, 16, 700)
+    + svgText(x + 9, y + (compact ? 42 : 50), truncate(value, 33), size, 400);
+};
 
 function exportSnapshot(person = selected) {
   if (!person) return null;
@@ -422,51 +483,53 @@ async function badgeSvg(panel, person = selected) {
     } catch (_) {}
   }
   let svg = '<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="3600" viewBox="0 0 600 900">'
-    + '<rect x="2" y="2" width="596" height="896" fill="#fff" stroke="#111" stroke-width="2"/>'
-    + '<rect x="12" y="12" width="576" height="876" fill="none" stroke="#555" stroke-width="1" stroke-dasharray="3 3"/>';
+    + '<rect x="2" y="2" width="596" height="896" fill="#fff" stroke="#111" stroke-width="2"/>';
 
   if (panel.id === 'front-card') {
     svg += '<image href="' + logoUrl + '" x="25" y="39" width="235" height="84" preserveAspectRatio="xMinYMid meet"/>'
       + svgText(576, 22, 'VER. 1.1', 14, 400, '#111', 'end')
-      + '<image href="' + sealUrl + '" x="477" y="30" width="82" height="90" preserveAspectRatio="xMidYMid meet"/>'
-      + '<rect x="466" y="124" width="105" height="53" fill="white" stroke="#111"/>'
-      + svgText(518.5, 145, 'REGISTRO', 14, 700, '#111', 'middle')
-      + svgText(518.5, 166, id, 18, 400, '#111', 'middle')
-      + '<rect x="22" y="183" width="174" height="248" fill="#e7e9ea" stroke="#555"/>';
-    if (photoUrl) svg += '<image href="' + photoUrl + '" x="24" y="185" width="170" height="244" preserveAspectRatio="xMidYMid slice"/>';
+      + '<image href="' + sealUrl + '" x="453" y="35" width="105" height="90" preserveAspectRatio="xMidYMid meet"/>'
+      + '<rect x="446" y="153" width="120" height="70" fill="white" stroke="#111"/>'
+      + svgText(506, 176, 'REGISTRO', 17, 700, '#111', 'middle')
+      + svgText(506, 215, id, 22, 400, '#111', 'middle')
+      + '<rect x="22" y="178" width="174" height="245" fill="#e7e9ea" stroke="#555"/>';
+    if (photoUrl) svg += '<image href="' + photoUrl + '" x="24" y="180" width="170" height="241" preserveAspectRatio="xMidYMid slice"/>';
     else svg += svgText(109, 315, 'FOTO', 20, 600, '#858b90', 'middle');
-    svg += svgField(206, 256, 372, 76, 'NOME', txt(row, 1), 18)
-      + svgField(206, 339, 372, 76, 'FUNÇÃO', txt(row, 2), 18)
-      + svgField(22, 454, 278, 72, 'EMPRESA', txt(row, 3), 18)
-      + svgField(300, 454, 278, 72, 'SETOR', txt(row, 4), 18)
-      + '<rect x="22" y="545" width="556" height="216" fill="white" stroke="#333"/>'
-      + '<line x1="326" y1="545" x2="326" y2="761" stroke="#444"/>'
-      + '<line x1="22" y1="579" x2="578" y2="579" stroke="#444"/>'
-      + svgText(31, 568, 'ÁREAS RESTRITAS', 15, 700)
-      + svgText(316, 568, 'VALIDADE', 13, 700, '#111', 'end')
-      + svgText(338, 568, 'DOCUMENTOS', 15, 700)
-      + svgText(568, 568, 'VALIDADE', 13, 700, '#111', 'end');
-    const areas = [11, 12, 13, 14].map(index => ({
-      name: headerName(index).replace(/^MIN$/i, 'MINA'),
-      date: formatMonthYear(txt(row, index))
-    })).filter(area => area.name && area.date);
+    svg += svgField(230, 256, 336, 67, 'NOME', txt(row, 1), 20)
+      + svgField(230, 357, 336, 67, 'FUNÇÃO', txt(row, 2), 20)
+      + '<rect x="22" y="459" width="556" height="72" fill="white" stroke="#222"/>'
+      + '<line x1="406" y1="459" x2="406" y2="531" stroke="#222"/>'
+      + svgText(31, 481, 'EMPRESA', 16, 700)
+      + svgText(31, 509, txt(row, 3), 20, 400)
+      + svgText(415, 481, 'SETOR', 16, 700)
+      + svgText(415, 509, txt(row, 4), 20, 400)
+      + '<rect x="22" y="558" width="544" height="203" fill="white" stroke="#333"/>'
+      + '<line x1="397" y1="558" x2="397" y2="761" stroke="#444"/>'
+      + '<line x1="22" y1="594" x2="566" y2="594" stroke="#444"/>'
+      + svgText(31, 582, 'AREAS RESTRITAS', 16, 700)
+      + svgText(481.5, 582, 'ASO', 16, 700, '#111', 'middle');
+    [627, 660, 694, 727].forEach(y => {
+      svg += '<line x1="397" y1="' + y + '" x2="566" y2="' + y + '" stroke="#666"/>';
+    });
+    const areas = restrictedAreas(row);
     areas.forEach((area, index) => {
-      const y = 610 + index * 35;
-      svg += svgText(32, y, area.name, 15, 400)
-        + svgText(316, y, area.date, 15, 700, '#111', 'end');
+      const y = 616 + index * 35;
+      svg += '<rect x="31" y="' + (y - 9) + '" width="10" height="10" fill="white" stroke="#111" stroke-width="1" stroke-dasharray="2 1"/>'
+        + (area.active ? svgText(36, y - 1, 'X', 8, 700, '#111', 'middle') : '')
+        + svgText(50, y, area.name, 18, 400)
+        + svgText(389, y, area.date, 18, 700, '#111', 'end');
     });
-    const validity = [
-      ['ASO', formatDate(txt(row, 7))],
-      ['INTEGR. VAL', formatDate(txt(row, 6))],
-      ['CNH VAL.', formatDate(txt(row, 10))]
-    ].filter(([, date]) => date);
-    validity.forEach(([label, date], index) => {
-      const y = 608 + index * 43;
-      svg += svgText(338, y, label, 13, 700) + svgText(568, y, date, 13, 400, '#111', 'end');
+    documentValidity(row).forEach((entry, index) => {
+      const y = 616 + index * 33;
+      if (entry.label) {
+        svg += svgText(481.5, y, entry.label, 14, 700, '#111', 'middle');
+      } else {
+        svg += svgText(481.5, y, entry.value, 15, 400, '#111', 'middle');
+      }
     });
-    svg += '<rect x="22" y="778" width="556" height="94" fill="#08643f"/>'
+    svg += '<rect x="22" y="778" width="556" height="94" fill="#21653d"/>'
       + svgText(300, 818, 'CONTROLE DE HABILITAÇÃO INTERNA', 18, 700, '#fff', 'middle')
-      + svgText(300, 847, '(C.H.I.)', 17, 700, '#fff', 'middle');
+      + svgText(300, 847, '(C.H.I)', 17, 700, '#fff', 'middle');
   } else {
     const groups = readGroups(row);
     const itemCount = groups.reduce((count, group) => count + group.items.length, 0);
@@ -474,10 +537,10 @@ async function badgeSvg(panel, person = selected) {
     let y = 15;
     groups.forEach(group => {
       svg += '<rect x="12" y="' + y + '" width="576" height="38" fill="#454c53"/>'
-        + svgText(23, y + 25, group.title, 14, 700, '#fff')
-        + svgText(577, y + 25, 'VALIDADE', 13, 700, '#fff', 'end');
+        + svgText(23, y + 25, group.title, 16, 700, '#fff')
+        + svgText(577, y + 25, 'VALIDADE', 15, 700, '#fff', 'end');
       y += 38;
-      const fontSize = Math.max(10, Math.min(15, rowStep * .54));
+      const fontSize = Math.max(12, Math.min(20, rowStep * .7));
       group.items.forEach(entry => {
         y += rowStep;
         svg += svgText(23, y, truncate(entry.name, 52), fontSize, 400)
@@ -485,14 +548,14 @@ async function badgeSvg(panel, person = selected) {
       });
       y += 8;
     });
-    svg += '<rect x="12" y="624" width="576" height="136" fill="white" stroke="#333" stroke-dasharray="3 3"/>'
+    svg += '<rect x="12" y="624" width="576" height="156" fill="white" stroke="#333"/>'
       + '<rect x="12" y="624" width="576" height="38" fill="#454c53"/>'
-      + svgText(23, 650, 'AUTORIZADO A PORTAR', 14, 700, '#fff')
-      + svgText(577, 650, 'SERIAL', 14, 700, '#fff', 'end')
-      + svgText(300, 726, txt(row, 70) || 'T.I. MVV', 14, 400, '#111', 'middle')
-      + '<rect x="12" y="760" width="576" height="112" fill="white" stroke="#333" stroke-dasharray="3 3"/>'
-      + '<line x1="180" y1="819" x2="420" y2="819" stroke="#333" stroke-width="2"/>'
-      + svgText(300, 850, 'SSO MVVV', 14, 400, '#111', 'middle');
+      + svgText(23, 650, 'AUTORIZADO A PORTAR', 16, 700, '#fff')
+      + svgText(577, 650, 'SERIAL', 16, 700, '#fff', 'end')
+      + svgText(300, 744, txt(row, 70) || 'T.I MVV', 16, 400, '#111', 'middle')
+      + '<rect x="12" y="780" width="576" height="104" fill="white" stroke="#333"/>'
+      + '<line x1="180" y1="834" x2="420" y2="834" stroke="#333" stroke-width="2"/>'
+      + svgText(300, 865, 'SSO MVV', 16, 400, '#111', 'middle');
   }
   return svg + '</svg>';
 }
@@ -632,6 +695,31 @@ $('#sheet-open').addEventListener('click', () => {
   updateSheetLabels();
   renderSheet();
   $('#sheet-dialog').showModal();
+});
+$('#fill-sheet').addEventListener('click', () => {
+  $('#sheet-password').value = '';
+  $('#sheet-auth-error').hidden = true;
+  $('#sheet-auth-dialog').showModal();
+  $('#sheet-password').focus();
+});
+$('#sheet-auth-close').addEventListener('click', () => $('#sheet-auth-dialog').close());
+$('#sheet-auth-cancel').addEventListener('click', () => $('#sheet-auth-dialog').close());
+$('#sheet-auth-form').addEventListener('submit', event => {
+  event.preventDefault();
+  if ($('#sheet-password').value !== 'Admin') {
+    $('#sheet-auth-error').hidden = false;
+    $('#sheet-password').focus();
+    $('#sheet-password').select();
+    return;
+  }
+  const link = document.createElement('a');
+  link.href = SHEET_EDIT_URL;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  document.body.append(link);
+  link.click();
+  link.remove();
+  $('#sheet-auth-dialog').close();
 });
 $('#sheet-close').addEventListener('click', () => $('#sheet-dialog').close());
 $('#sheet-tab-matrix').addEventListener('click', () => {

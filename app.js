@@ -118,12 +118,14 @@ function accessIsCurrent(value) {
 function restrictedAreas(row) {
   const labels = ['SE', 'MINA', 'PAIOL', 'BRR'];
   return labels.map((fallback, offset) => {
-    const value = txt(row, offset + 11);
+    const index = offset + 11;
+    const value = txt(row, index);
+    const rawExpiry = Array.isArray(row) ? value : row?.c?.[index]?.v ?? value;
     const name = headerName(offset + 11).replace(/^MIN$/i, 'MINA') || fallback;
     return {
       name,
       date: formatMonthYear(value),
-      active: accessIsCurrent(value)
+      active: accessIsCurrent(rawExpiry)
     };
   });
 }
@@ -503,28 +505,28 @@ async function badgeSvg(panel, person = selected) {
       + svgText(31, 509, txt(row, 3), 20, 400)
       + svgText(415, 481, 'SETOR', 16, 700)
       + svgText(415, 509, txt(row, 4), 20, 400)
-      + '<rect x="22" y="558" width="544" height="203" fill="white" stroke="#333"/>'
-      + '<line x1="397" y1="558" x2="397" y2="761" stroke="#444"/>'
-      + '<line x1="22" y1="594" x2="566" y2="594" stroke="#444"/>'
+      + '<rect x="22" y="558" width="556" height="203" fill="white" stroke="#333"/>'
+      + '<line x1="405" y1="558" x2="405" y2="761" stroke="#444"/>'
+      + '<line x1="22" y1="594" x2="578" y2="594" stroke="#444"/>'
       + svgText(31, 582, 'AREAS RESTRITAS', 16, 700)
-      + svgText(481.5, 582, 'ASO', 16, 700, '#111', 'middle');
+      + svgText(491.5, 582, 'ASO', 16, 700, '#111', 'middle');
     [627, 660, 694, 727].forEach(y => {
-      svg += '<line x1="397" y1="' + y + '" x2="566" y2="' + y + '" stroke="#666"/>';
+      svg += '<line x1="405" y1="' + y + '" x2="578" y2="' + y + '" stroke="#666"/>';
     });
     const areas = restrictedAreas(row);
     areas.forEach((area, index) => {
-      const y = 616 + index * 35;
+      const y = 594 + (167 / 4) * (index + .55);
       svg += '<rect x="31" y="' + (y - 9) + '" width="10" height="10" fill="white" stroke="#111" stroke-width="1" stroke-dasharray="2 1"/>'
         + (area.active ? svgText(36, y - 1, 'X', 8, 700, '#111', 'middle') : '')
         + svgText(50, y, area.name, 18, 400)
-        + svgText(389, y, area.date, 18, 700, '#111', 'end');
+        + svgText(397, y, area.date, 18, 700, '#111', 'end');
     });
     documentValidity(row).forEach((entry, index) => {
       const y = 616 + index * 33;
       if (entry.label) {
-        svg += svgText(481.5, y, entry.label, 14, 700, '#111', 'middle');
+        svg += svgText(491.5, y, entry.label, 14, 700, '#111', 'middle');
       } else {
-        svg += svgText(481.5, y, entry.value, 15, 400, '#111', 'middle');
+        svg += svgText(491.5, y, entry.value, 15, 400, '#111', 'middle');
       }
     });
     svg += '<rect x="22" y="778" width="556" height="94" fill="#21653d"/>'

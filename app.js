@@ -218,7 +218,7 @@ async function loadData() {
     matrixTable = matrix;
     window.__headers = matrix.cols.map(column => column.label || '');
     staff = matrix.rows.map(row => ({ cells: row, id: txt(row, 0) })).filter(person => person.id);
-    setStatus('Planilha atualizada · ' + staff.length + ' colaboradores');
+    setStatus('Dados carregados.');
     updateSuggestions();
     updateSheetLabels();
     $('#sheet-open').disabled = false;
@@ -428,7 +428,7 @@ async function badgeSvg(panel, person = selected) {
   if (panel.id === 'front-card') {
     svg += '<image href="' + logoUrl + '" x="25" y="39" width="235" height="84" preserveAspectRatio="xMinYMid meet"/>'
       + svgText(576, 22, 'VER. 1.1', 14, 400, '#111', 'end')
-      + '<image href="' + sealUrl + '" x="473" y="22" width="92" height="101" preserveAspectRatio="xMidYMid meet"/>'
+      + '<image href="' + sealUrl + '" x="477" y="30" width="82" height="90" preserveAspectRatio="xMidYMid meet"/>'
       + '<rect x="466" y="124" width="105" height="53" fill="white" stroke="#111"/>'
       + svgText(518.5, 145, 'REGISTRO', 14, 700, '#111', 'middle')
       + svgText(518.5, 166, id, 18, 400, '#111', 'middle')

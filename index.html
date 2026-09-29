@@ -4,18 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#3b444d">
-  <title>Crachá | US Vale Verde</title>
-  <link rel="stylesheet" href="styles.css">
-  <script src="app.js" defer></script>
+  <title>Carteira de Habilitação Interna - CHI - Enaex Brasil</title>
+  <link rel="stylesheet" href="styles.css?v=20260928-chi-visual-2">
+  <script src="app.js?v=20260928-chi-visual-2" defer></script>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 </head>
 <body>
-  <header class="topbar"><div class="brand"><img src="assets/openblast-mark.png" alt=""><b>Open<span>Blast</span></b></div><strong>Ferramentas : US Vale Verde</strong><span></span></header>
+  <header class="topbar"><div class="brand"><img src="assets/enaex-white.png" alt="Enaex Brasil"></div><strong>Carteira de Habilitação Interna - CHI - Enaex Brasil</strong><span aria-hidden="true"></span></header>
   <main>
     <section class="toolbar" aria-label="Localizar colaborador">
       <label for="registro">NOME OU REGISTRO</label>
       <div class="searchline"><input id="registro" type="search" list="staff-suggestions" autocomplete="off" placeholder="Digite o nome ou o registro"><datalist id="staff-suggestions"></datalist><button id="search" class="primary">Buscar</button><button id="sheet-open" class="outline" type="button" disabled>Ver planilha</button><button id="refresh" class="sync" title="Atualizar dados da planilha" aria-label="Atualizar dados">↻</button></div>
-      <small id="source-status" role="status">Conectando à planilha…</small>
+      <small id="source-status" class="visually-hidden" role="status" aria-live="polite">Conectando à planilha…</small>
     </section>
 
     <section id="result" class="result" hidden>

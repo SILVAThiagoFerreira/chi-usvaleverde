@@ -22,23 +22,25 @@ body { margin: 0; }
   color: #fff;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 0 max(calc((100vw - 1180px) / 2), 28px);
   position: relative;
 }
-.brand { display: flex; align-items: center; gap: 6px; }
+.brand { display: flex; align-items: center; flex: 0 0 112px; }
 .brand img {
-  width: 22px;
-  height: 36px;
+  width: 108px;
+  height: auto;
   object-fit: contain;
-  filter: brightness(0) invert(1);
 }
-.brand b { font-size: 15px; color: #fff; }
-.brand b span { color: #f20b19; }
+.topbar > span { width: 112px; flex: 0 0 112px; }
 .topbar strong {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
+  width: min(66vw, 720px);
   font-size: 14px;
+  line-height: 1.2;
+  text-align: center;
   white-space: nowrap;
 }
 
@@ -55,9 +57,9 @@ main { max-width: 1180px; margin: 26px auto 0; padding: 0 14px; }
   font-weight: 700;
 }
 .toolbar > label { display: block; }
-.searchline { display: flex; gap: 10px; margin-top: 8px; }
+.searchline { display: flex; gap: 8px; margin-top: 7px; }
 .searchline input {
-  height: 44px;
+  height: 38px;
   border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0 13px;
@@ -68,35 +70,45 @@ main { max-width: 1180px; margin: 26px auto 0; padding: 0 14px; }
 }
 .searchline input:focus { outline: 2px solid #f6a0a5; outline-offset: 1px; }
 .primary, .outline, .sync, .upload {
-  height: 40px;
+  height: 36px;
   border-radius: 4px;
   border: 1px solid var(--red);
   background: var(--red);
   color: #fff;
-  padding: 0 16px;
-  font-size: 13px;
+  padding: 0 12px;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
 }
 .primary:disabled { opacity: .5; cursor: default; }
-.toolbar > .sync {
-  position: absolute;
-  right: 0;
-  bottom: 12px;
-  height: 44px;
-  width: 48px;
-  font-size: 23px;
+.searchline .sync {
+  width: 36px;
+  flex: 0 0 36px;
+  font-size: 17px;
   padding: 0;
 }
-.searchline { padding-right: 58px; }
-.toolbar small {
-  position: absolute;
-  right: 58px;
-  bottom: 1px;
-  color: #6d7680;
-  font-size: 10px;
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
-.toolbar small[data-state="error"] { color: #c90012; }
+.visually-hidden[data-state="error"] {
+  position: static !important;
+  width: auto;
+  height: auto;
+  margin: 6px 0 0;
+  overflow: visible;
+  clip: auto;
+  color: #bd0010;
+  font-size: 11px;
+  white-space: normal;
+}
 
 .result { padding-top: 20px; }
 .personline {
@@ -112,7 +124,7 @@ main { max-width: 1180px; margin: 26px auto 0; padding: 0 14px; }
 .actions { display: flex; align-items: center; gap: 8px; }
 .outline { background: #fff; color: var(--red); }
 .upload {
-  height: 38px;
+  height: 36px;
   display: flex;
   align-items: center;
   background: #fff;
@@ -125,6 +137,7 @@ main { max-width: 1180px; margin: 26px auto 0; padding: 0 14px; }
   width: min(45%, 232px);
   aspect-ratio: 2 / 3;
   flex: 0 1 232px;
+  zoom: 1.25;
   border: 1px solid #303030;
   outline: 1px dotted #777;
   outline-offset: -5px;
@@ -158,14 +171,14 @@ main { max-width: 1180px; margin: 26px auto 0; padding: 0 14px; }
 }
 .credential {
   position: absolute;
-  top: 1px;
+  top: 0;
   right: 1px;
   width: 45px;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
-.seal { width: 35px; height: 38px; object-fit: contain; }
+.seal { width: 32px; height: 32px; margin-top: 8px; object-fit: contain; flex: 0 0 32px; }
 .badge-register {
   width: 45px;
   height: 20px;
@@ -178,7 +191,7 @@ main { max-width: 1180px; margin: 26px auto 0; padding: 0 14px; }
 }
 .badge-register b { font-size: 6.5px; }
 .badge-register span { font-size: 8.5px; }
-.version { position: absolute; top: -1px; right: 0; font-size: 6px; }
+.version { position: absolute; top: 0; right: 0; font-size: 6px; }
 .portrait-row {
   height: 95px;
   flex: 0 0 95px;
@@ -331,7 +344,7 @@ main { max-width: 1180px; margin: 26px auto 0; padding: 0 14px; }
 .signature b { font-size: 5.8px; font-weight: 400; }
 
 .sides {
-  max-width: 458px;
+  max-width: 594px;
   margin: 8px auto 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -452,23 +465,21 @@ footer i {
 @media (max-width: 700px) {
   main { margin-top: 16px; }
   .topbar { padding: 0 14px; }
-  .brand img { width: 18px; }
-  .brand b { font-size: 13px; }
-  .topbar strong { left: auto; right: 14px; transform: none; font-size: 11px; }
-  .toolbar { padding-bottom: 17px; }
-  .toolbar small { right: auto; left: 0; bottom: 3px; }
-  .toolbar > .sync { display: none; }
-  .searchline { padding-right: 0; }
+  .brand { flex-basis: 98px; }
+  .brand img { width: 96px; }
+  .topbar strong { position: static; width: auto; min-width: 0; flex: 1; margin-left: 12px; transform: none; font-size: clamp(11px, 1.8vw, 14px); text-align: right; white-space: normal; }
+  .topbar > span { display: none; }
+  .toolbar { padding-bottom: 12px; }
   .cards { gap: 8px; }
-  .badge { width: min(46%, 232px); flex-basis: 46%; }
+  .badge { width: min(47%, 232px); flex-basis: auto; }
   .personline { align-items: flex-start; gap: 12px; flex-direction: column; }
   .actions { flex-wrap: wrap; }
-  .sides { display: none; }
 }
 
-@media (max-width: 540px) {
+@media (max-width: 640px) {
   .cards { flex-direction: column; align-items: center; }
   .badge { width: min(100%, 232px); flex-basis: auto; }
+  .sides { display: none; }
   .personline h1 { font-size: 18px; }
   .searchline { gap: 6px; }
   .searchline input { padding: 0 9px; font-size: 13px; }
@@ -482,11 +493,22 @@ footer i {
 }
 
 @media (max-width: 360px) {
-  .topbar strong { font-size: 10px; right: 10px; }
-  .brand { gap: 3px; }
-  .brand b { font-size: 12px; }
+  .topbar { padding-inline: 10px; }
+  .brand { flex-basis: 92px; }
+  .brand img { width: 90px; }
+  .topbar strong { font-size: 11px; margin-left: 8px; }
+  .badge { zoom: 1.15; }
   .actions { gap: 6px; }
-  .upload, .primary, .outline { font-size: 12px; padding-inline: 9px; }
+  .upload, .primary, .outline, .sync { font-size: 11px; padding-inline: 8px; }
+  .searchline .sync { padding: 0; }
+}
+
+@media (max-width: 309px) {
+  .badge { zoom: 1.08; }
+}
+
+@media (max-width: 293px) {
+  .badge { zoom: 1; }
 }
 
 @media print {
@@ -499,6 +521,7 @@ footer i {
   .badge {
     width: 54mm;
     height: 81mm;
+    zoom: 1;
     aspect-ratio: auto;
     outline-offset: -1mm;
     box-shadow: none;

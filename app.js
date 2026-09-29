@@ -250,7 +250,13 @@ function statusForRow(row, columns, sourceRow) {
     if (remainingDays <= 0) earliestRatio = -1;
     else earliestRatio = Math.min(earliestRatio, remainingDays / termDays);
   });
-  if (!hasPeriod) return normalize(txt(sourceRow, 5));
+  if (!hasPeriod) {
+    const sourceStatus = normalize(txt(sourceRow, 5));
+    if (sourceStatus === 'atencao') return 'ATENÇÃO';
+    if (sourceStatus === 'vencido') return 'VENCIDO';
+    if (sourceStatus === 'valido') return 'VÁLIDO';
+    return txt(sourceRow, 5);
+  }
   return earliestRatio <= 0 ? 'VENCIDO' : earliestRatio <= .2 ? 'ATENÇÃO' : 'VÁLIDO';
 }
 

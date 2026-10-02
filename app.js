@@ -159,6 +159,37 @@ function headerName(index) {
 }
 
 function readGroups(row) {
+  const headers = Array.isArray(window.__headers) ? window.__headers : [];
+  const restrictedAreaNames = new Set(['se', 'min', 'mina', 'paiol', 'brr', 'ctpp']);
+  let lastRestrictedArea = -1;
+  headers.forEach((_, index) => {
+    if (index >= 11 && restrictedAreaNames.has(normalize(headerName(index)))) lastRestrictedArea = index;
+  });
+
+  // The current Matrix sheet condenses its training columns after the restricted-area block.
+  // Keep the original category groups when the older, wider layout is still in use.
+  const compactTrainingStart = lastRestrictedArea + 1;
+  if (compactTrainingStart >= 16 && compactTrainingStart < 19) {
+    const operatingNames = new Set([
+      'operacao e manutencao umb',
+      'direcao defensiva',
+      'veiculos leves (cat.b)'
+    ]);
+    const groups = new Map();
+    headers.slice(compactTrainingStart).forEach((_, offset) => {
+      const index = compactTrainingStart + offset;
+      if (!/^\s*\d+\s+\S/.test(String(headers[index] || ''))) return;
+      const name = canonicalTrainingName(headerName(index));
+      const date = formatDate(txt(row, index));
+      if (!name || !date) return;
+      const title = operatingNames.has(normalize(name))
+        ? 'AUTORIZADO A OPERAR' : 'AUTORIZADO A EXECUTAR';
+      if (!groups.has(title)) groups.set(title, []);
+      groups.get(title).push({ name, date });
+    });
+    return Array.from(groups, ([title, items]) => ({ title, items }));
+  }
+
   const ranges = [
     { title: 'AUTORIZADO A EXECUTAR', indices: Array.from({ length: 23 }, (_, i) => i + 19) },
     { title: 'AUTORIZADO A OPERAR', indices: Array.from({ length: 12 }, (_, i) => i + 42) },

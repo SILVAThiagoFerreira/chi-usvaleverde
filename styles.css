@@ -629,3 +629,11 @@ footer i {
   }
   .badge * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* ---- Faixa superior Enaex (ferramenta, não hub): grafite, filete vermelho, logo, título e unidade ---- */
+.enaex-band { width: 100vw; margin-left: calc(50% - 50vw); position: sticky; top: 0; z-index: 50; display: grid; grid-template-columns: 1fr minmax(0, auto) 1fr; align-items: center; gap: 16px; box-sizing: border-box; height: 50px; padding: 0 35px 0 45px; background: #3a434b; border-bottom: 3px solid #E20613; color: #fff; }
+.enaex-band__logo { justify-self: start; min-width: 0; }
+.enaex-band__logo img { display: block; width: 90px; height: auto; }
+.enaex-band__title { min-width: 0; font: 700 20px/1 Arial, Helvetica, sans-serif; color: #fff; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.enaex-band__unit { justify-self: end; font: 500 10.5px/1 Arial, Helvetica, sans-serif; letter-spacing: .14em; text-transform: uppercase; color: #c4c7cb; white-space: nowrap; }
+@media (max-width: 640px) { .enaex-band { gap: 10px; grid-template-columns: auto minmax(0, 1fr) auto; padding: 0 16px; } .enaex-band__logo img { width: 64px; } .enaex-band__title { font-size: 15px; } .enaex-band__unit { font-size: 9px; letter-spacing: .08em; } }

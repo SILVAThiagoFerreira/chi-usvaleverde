@@ -16,10 +16,10 @@
 body { margin: 0; }
 
 .topbar {
-  height: 58px;
-  background: var(--ink);
-  border-bottom: 3px solid var(--red);
-  color: #fff;
+  height: 64px;
+  background: #fff;
+  border-bottom: 1px solid #e3e3e3;
+  color: #B5121B;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -38,10 +38,15 @@ body { margin: 0; }
   left: 50%;
   transform: translateX(-50%);
   width: min(66vw, 720px);
-  font-size: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: .4px;
   line-height: 1.2;
   text-align: center;
+  text-transform: uppercase;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 main { max-width: 1180px; margin: 26px auto 0; padding: 0 14px; }
@@ -122,7 +127,7 @@ main { max-width: 1180px; margin: 26px auto 0; padding: 0 14px; }
 .personline h1 { font-size: 20px; line-height: 1.2; margin: 3px 0; }
 .personline p { font-size: 13px; margin: 3px 0; color: #606a73; }
 .actions { display: flex; align-items: center; gap: 8px; }
-.outline { background: #fff; color: var(--red); }
+.outline { background: #fff; color: #3d4148; border-color: #c4c7cb; }
 .upload {
   height: 36px;
   display: flex;
@@ -546,14 +551,16 @@ main { max-width: 1180px; margin: 26px auto 0; padding: 0 14px; }
 footer {
   max-width: 1180px;
   margin: 28px auto 0;
-  border-top: 1px solid var(--line);
-  padding: 17px 14px 25px;
-  color: #76808a;
+  border-top: 1px solid #3d4148;
+  padding: 12px 14px 22px;
+  color: #8a8f96;
   font-size: 9px;
   letter-spacing: 1.4px;
+  text-align: right;
+  text-transform: uppercase;
 }
 footer i {
-  display: inline-block;
+  display: none;
   width: 6px;
   height: 6px;
   border-radius: 50%;
